@@ -1,9 +1,13 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Azure.WebJobs.Script.Description;
+using Microsoft.Azure.WebJobs.Script.Rpc;
+using FunctionMetadata = Microsoft.Azure.WebJobs.Script.Description.FunctionMetadata;
 
 namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
 {
@@ -16,14 +20,17 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
         private RequestDelegate _invoke;
         private double _specialized = 0;
 
+        private ILanguageWorkerChannelManager _languageWorkerChannelManager;
+
         public PlaceholderSpecializationMiddleware(RequestDelegate next, IScriptWebHostEnvironment webHostEnvironment,
-            IStandbyManager standbyManager, IEnvironment environment)
+            IStandbyManager standbyManager, IEnvironment environment, ILanguageWorkerChannelManager languageWorkerChannelManager)
         {
             _next = next;
             _invoke = InvokeSpecializationCheck;
             _webHostEnvironment = webHostEnvironment;
             _standbyManager = standbyManager;
             _environment = environment;
+            _languageWorkerChannelManager = languageWorkerChannelManager;
         }
 
         public async Task Invoke(HttpContext httpContext)
@@ -35,6 +42,20 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
         {
             if (!_webHostEnvironment.InStandbyMode && _environment.IsContainerReady())
             {
+                var channel = _languageWorkerChannelManager.GetChannels("node").FirstOrDefault();
+
+                ScriptInvocationContext scriptInvocationContext = new ScriptInvocationContext()
+                {
+                    ResultSource = new TaskCompletionSource<ScriptInvocationResult>(),
+                    FunctionMetadata = new FunctionMetadata()
+                };
+
+                scriptInvocationContext.FunctionMetadata.Name = "Ping";
+
+                channel.SendInvocationRequest(scriptInvocationContext);
+
+                await scriptInvocationContext.ResultSource.Task;
+
                 // We don't want AsyncLocal context (like Activity.Current) to flow
                 // here as it will contain request details. Suppressing this context
                 // prevents the request context from being captured by the host.

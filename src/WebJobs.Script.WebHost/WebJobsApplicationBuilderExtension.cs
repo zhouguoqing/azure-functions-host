@@ -41,6 +41,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             });
 
             builder.UseMiddleware<HostWarmupMiddleware>();
+            builder.UseMiddleware<SpecializationHack>();
 
             // This middleware must be registered before any other middleware depending on
             // JobHost/ScriptHost scoped services.

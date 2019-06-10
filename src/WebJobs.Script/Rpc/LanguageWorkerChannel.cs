@@ -9,9 +9,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Google.Protobuf.Collections;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
+
 using Microsoft.Azure.WebJobs.Logging;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.Diagnostics;
@@ -21,7 +25,7 @@ using Microsoft.Azure.WebJobs.Script.Grpc.Messages;
 using Microsoft.Azure.WebJobs.Script.ManagedDependencies;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-
+using Newtonsoft.Json;
 using FunctionMetadata = Microsoft.Azure.WebJobs.Script.Description.FunctionMetadata;
 using MsgType = Microsoft.Azure.WebJobs.Script.Grpc.Messages.StreamingMessage.ContentOneofCase;
 
@@ -369,7 +373,7 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             });
         }
 
-        internal void SendFunctionLoadRequest(FunctionMetadata metadata)
+        public void SendFunctionLoadRequest(FunctionMetadata metadata)
         {
             _workerChannelLogger.LogDebug("Sending FunctionLoadRequest for function:{functionName} with functionId:{id}", metadata.Name, metadata.FunctionId);
 
@@ -426,59 +430,79 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             _inputLinks.Add(disposableLink);
         }
 
-        internal void SendInvocationRequest(ScriptInvocationContext context)
+        public void SendInvocationRequest(ScriptInvocationContext context)
         {
             try
             {
-                if (_functionLoadErrors.ContainsKey(context.FunctionMetadata.FunctionId))
+                InvocationRequest invocationRequest = new InvocationRequest()
                 {
-                    _workerChannelLogger.LogDebug($"Function {context.FunctionMetadata.Name} failed to load");
-                    context.ResultSource.TrySetException(_functionLoadErrors[context.FunctionMetadata.FunctionId]);
-                    _executingInvocations.TryRemove(context.ExecutionContext.InvocationId.ToString(), out ScriptInvocationContext _);
-                }
-                else
+                    FunctionId = context.FunctionMetadata.FunctionId,
+                    InvocationId = Guid.NewGuid().ToString(),
+                };
+
+                var headers = new HeaderDictionary();
+                headers.Add("content-type", "application/json");
+                HttpRequest request = CreateHttpRequest("GET", "http://localhost/api/httptrigger-scenarios", headers);
+                invocationRequest.InputData.Add(new ParameterBinding()
                 {
-                    if (context.CancellationToken.IsCancellationRequested)
-                    {
-                        context.ResultSource.SetCanceled();
-                        return;
-                    }
-
-                    var functionMetadata = context.FunctionMetadata;
-
-                    InvocationRequest invocationRequest = new InvocationRequest()
-                    {
-                        FunctionId = functionMetadata.FunctionId,
-                        InvocationId = context.ExecutionContext.InvocationId.ToString(),
-                    };
-                    foreach (var pair in context.BindingData)
-                    {
-                        if (pair.Value != null)
-                        {
-                            invocationRequest.TriggerMetadata.Add(pair.Key, pair.Value.ToRpc(_workerChannelLogger));
-                        }
-                    }
-                    foreach (var input in context.Inputs)
-                    {
-                        invocationRequest.InputData.Add(new ParameterBinding()
-                        {
-                            Name = input.name,
-                            Data = input.val.ToRpc(_workerChannelLogger)
-                        });
-                    }
-
-                    _executingInvocations.TryAdd(invocationRequest.InvocationId, context);
-
-                    SendStreamingMessage(new StreamingMessage
-                    {
-                        InvocationRequest = invocationRequest
-                    });
-                }
+                    Name = "testHttpRequest",
+                    Data = request.ToRpc(_workerChannelLogger)
+                });
+                _executingInvocations.TryAdd(invocationRequest.InvocationId, context);
+                SendStreamingMessage(new StreamingMessage
+                {
+                    InvocationRequest = invocationRequest
+                });
             }
             catch (Exception invokeEx)
             {
                 context.ResultSource.TrySetException(invokeEx);
             }
+        }
+
+        public static HttpRequest CreateHttpRequest(string method, string uriString, IHeaderDictionary headers = null, object body = null)
+        {
+            var uri = new Uri(uriString);
+            var request = new DefaultHttpContext().Request;
+            var requestFeature = request.HttpContext.Features.Get<IHttpRequestFeature>();
+            requestFeature.Method = method;
+            requestFeature.Scheme = uri.Scheme;
+            requestFeature.Path = uri.GetComponents(UriComponents.KeepDelimiter | UriComponents.Path, UriFormat.Unescaped);
+            requestFeature.PathBase = string.Empty;
+            requestFeature.QueryString = uri.GetComponents(UriComponents.KeepDelimiter | UriComponents.Query, UriFormat.Unescaped);
+
+            headers = headers ?? new HeaderDictionary();
+
+            if (!string.IsNullOrEmpty(uri.Host))
+            {
+                headers.Add("Host", uri.Host);
+            }
+
+            if (body != null)
+            {
+                byte[] bytes = null;
+                if (body is string bodyString)
+                {
+                    bytes = Encoding.UTF8.GetBytes(bodyString);
+                }
+                else if (body is byte[] bodyBytes)
+                {
+                    bytes = bodyBytes;
+                }
+                else
+                {
+                    string bodyJson = JsonConvert.SerializeObject(body);
+                    bytes = Encoding.UTF8.GetBytes(bodyJson);
+                }
+
+                requestFeature.Body = new MemoryStream(bytes);
+                request.ContentLength = request.Body.Length;
+                headers.Add("Content-Length", request.Body.Length.ToString());
+            }
+
+            requestFeature.Headers = headers;
+
+            return request;
         }
 
         internal void InvokeResponse(InvocationResponse invokeResponse)
