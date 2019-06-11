@@ -25,6 +25,8 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             IEnvironment environment = builder.ApplicationServices.GetService<IEnvironment>() ?? SystemEnvironment.Instance;
             IOptionsMonitor<StandbyOptions> standbyOptions = builder.ApplicationServices.GetService<IOptionsMonitor<StandbyOptions>>();
 
+            builder.UseMiddleware<SpecializationHack>();
+
             builder.UseMiddleware<SystemTraceMiddleware>();
             builder.UseMiddleware<HostnameFixupMiddleware>();
             builder.UseMiddleware<EnvironmentReadyCheckMiddleware>();
@@ -41,7 +43,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             });
 
             builder.UseMiddleware<HostWarmupMiddleware>();
-            builder.UseMiddleware<SpecializationHack>();
 
             // This middleware must be registered before any other middleware depending on
             // JobHost/ScriptHost scoped services.

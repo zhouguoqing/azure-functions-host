@@ -5,9 +5,14 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Azure.WebJobs.Script.Binding;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.Rpc;
 using FunctionMetadata = Microsoft.Azure.WebJobs.Script.Description.FunctionMetadata;
@@ -78,39 +83,44 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
                     Bindings = bindings
                 };
 
-                //TaskCompletionSource<bool> loadTask = new TaskCompletionSource<bool>();
-
-                //channel.SendFunctionLoadRequest(functionMetadata, loadTask);
-
-                //await loadTask.Task;
-
                 ScriptInvocationContext scriptInvocationContext = new ScriptInvocationContext()
                 {
                     FunctionMetadata = functionMetadata,
                     ResultSource = new TaskCompletionSource<ScriptInvocationResult>()
                 };
 
-                //scriptInvocationContext.FunctionMetadata.Name = "Ping";
-
                 channel.SendInvocationRequest(scriptInvocationContext);
 
-                await scriptInvocationContext.ResultSource.Task;
+                var t = await scriptInvocationContext.ResultSource.Task;
 
-                // We don't want AsyncLocal context (like Activity.Current) to flow
-                // here as it will contain request details. Suppressing this context
-                // prevents the request context from being captured by the host.
-                Task specializeTask;
-                using (System.Threading.ExecutionContext.SuppressFlow())
-                {
-                    // We need this to go async immediately, so use Task.Run.
-                    specializeTask = Task.Run(_standbyManager.SpecializeHostAsync);
-                }
-                await specializeTask;
+                var result = new OkObjectResult(t.Return);
+                ActionContext actionContext = new ActionContext(httpContext, new RouteData(), new ActionDescriptor());
+                await result.ExecuteResultAsync(actionContext);
 
-                if (Interlocked.CompareExchange(ref _specialized, 1, 0) == 0)
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+                Task.Run(async () =>
                 {
-                    Interlocked.Exchange(ref _invoke, _next);
-                }
+                    // We don't want AsyncLocal context (like Activity.Current) to flow
+                    // here as it will contain request details. Suppressing this context
+                    // prevents the request context from being captured by the host.
+                    Task specializeTask;
+                    using (System.Threading.ExecutionContext.SuppressFlow())
+                    {
+                        // We need this to go async immediately, so use Task.Run.
+                        specializeTask = Task.Run(_standbyManager.SpecializeHostAsync);
+                    }
+                    await specializeTask;
+
+                    if (Interlocked.CompareExchange(ref _specialized, 1, 0) == 0)
+                    {
+                        Interlocked.Exchange(ref _invoke, _next);
+                    }
+
+                    await _next(httpContext);
+                });
+#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+
+                return;
             }
 
             await _next(httpContext);
