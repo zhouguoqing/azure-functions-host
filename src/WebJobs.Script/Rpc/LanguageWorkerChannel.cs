@@ -45,6 +45,7 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
         private bool _disposed;
         private bool _disposing;
         private bool _isWebHostChannel;
+        private TaskCompletionSource<bool> _loadTask;
         private WorkerInitResponse _initMessage;
         private string _workerId;
         private Process _process;
@@ -349,7 +350,7 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             {
                 foreach (FunctionMetadata metadata in _functions)
                 {
-                    SendFunctionLoadRequest(metadata);
+                    SendFunctionLoadRequest(metadata, new TaskCompletionSource<bool>());
                 }
             }
         }
@@ -373,10 +374,10 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             });
         }
 
-        public void SendFunctionLoadRequest(FunctionMetadata metadata)
+        public void SendFunctionLoadRequest(FunctionMetadata metadata, TaskCompletionSource<bool> loadTask)
         {
             _workerChannelLogger.LogDebug("Sending FunctionLoadRequest for function:{functionName} with functionId:{id}", metadata.Name, metadata.FunctionId);
-
+            _loadTask = loadTask;
             // send a load request for the registered function
             FunctionLoadRequest request = new FunctionLoadRequest()
             {
@@ -428,6 +429,7 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             // associate the invocation input buffer with the function
             var disposableLink = _functionInputBuffers[loadResponse.FunctionId].LinkTo(invokeBlock);
             _inputLinks.Add(disposableLink);
+            _loadTask.SetResult(true);
         }
 
         public void SendInvocationRequest(ScriptInvocationContext context)

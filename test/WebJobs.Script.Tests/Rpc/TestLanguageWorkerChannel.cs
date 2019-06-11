@@ -91,5 +91,10 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Rpc
             Exception testEx = new Exception("Test Worker Error");
             _eventManager.Publish(new WorkerErrorEvent(_runtime, Id, testEx));
         }
+
+        public void SendFunctionLoadRequest(FunctionMetadata metadata, TaskCompletionSource<bool> loadTask)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

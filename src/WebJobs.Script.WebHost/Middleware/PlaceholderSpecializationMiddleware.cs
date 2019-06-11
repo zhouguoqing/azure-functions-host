@@ -1,6 +1,9 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -42,15 +45,52 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
         {
             if (!_webHostEnvironment.InStandbyMode && _environment.IsContainerReady())
             {
-                var channel = _languageWorkerChannelManager.GetChannels("node").FirstOrDefault();
+                ILanguageWorkerChannel channel = _languageWorkerChannelManager.GetChannels("node").FirstOrDefault();
+                BindingMetadata bindingMetadataIn = new BindingMetadata()
+                {
+                    Type = "httpTrigger",
+                    Direction = BindingDirection.In,
+                    Name = "req"
+                };
+
+                BindingMetadata bindingMetadataOut = new BindingMetadata()
+                {
+                    Type = "http",
+                    Direction = BindingDirection.Out,
+                    Name = "res"
+                };
+
+                Collection<BindingMetadata> bindings = new Collection<BindingMetadata>()
+                {
+                    bindingMetadataIn,
+                    bindingMetadataOut
+                };
+
+                FunctionMetadata functionMetadata = new FunctionMetadata()
+                {
+                    FunctionDirectory = @"D:\pgopaGit\azure-functions-nodejs-worker\test\end-to-end\testFunctionApp\HttpTrigger",
+                    Language = "node",
+                    Name = "HttpTrigger",
+                    ScriptFile = @"D:\pgopaGit\azure-functions-nodejs-worker\test\end-to-end\testFunctionApp\HttpTrigger\index.js",
+                    IsProxy = false,
+                    IsDisabled = false,
+                    IsDirect = false,
+                    Bindings = bindings
+                };
+
+                //TaskCompletionSource<bool> loadTask = new TaskCompletionSource<bool>();
+
+                //channel.SendFunctionLoadRequest(functionMetadata, loadTask);
+
+                //await loadTask.Task;
 
                 ScriptInvocationContext scriptInvocationContext = new ScriptInvocationContext()
                 {
-                    ResultSource = new TaskCompletionSource<ScriptInvocationResult>(),
-                    FunctionMetadata = new FunctionMetadata()
+                    FunctionMetadata = functionMetadata,
+                    ResultSource = new TaskCompletionSource<ScriptInvocationResult>()
                 };
 
-                scriptInvocationContext.FunctionMetadata.Name = "Ping";
+                //scriptInvocationContext.FunctionMetadata.Name = "Ping";
 
                 channel.SendInvocationRequest(scriptInvocationContext);
 

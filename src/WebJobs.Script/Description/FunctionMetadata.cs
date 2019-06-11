@@ -57,7 +57,7 @@ namespace Microsoft.Azure.WebJobs.Script.Description
         /// </summary>
         public bool IsProxy { get; set; }
 
-        public Collection<BindingMetadata> Bindings { get; }
+        public Collection<BindingMetadata> Bindings { get; set; }
 
         public IEnumerable<BindingMetadata> InputBindings
         {
