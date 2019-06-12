@@ -2,7 +2,10 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 using System;
+using System.Net.Http;
+using Microsoft.Azure.WebJobs.Script.WebHost.Metrics;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics
 {
@@ -71,7 +74,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics
         {
             string hostVersion = ScriptHost.Version;
 
-            _writeEvent($"{ScriptConstants.LinuxMetricEventStreamName} {subscriptionId},{appName},{functionName},{eventName},{average},{minimum},{maximum},{count},{hostVersion},{eventTimestamp.ToString(EventTimestampFormat)},{NormalizeString(data)},{_containerName},{StampName},{TenantId},,,,");
+            _writeEvent($"{ScriptConstants.LinuxMetricEventStreamName} {subscriptionId},{appName},{functionName},{eventName},{average},{minimum},{maximum},{count},{hostVersion},{eventTimestamp.ToString(EventTimestampFormat)},{NormalizeString(data)},{_containerName},{StampName},{TenantId}");
         }
 
         public override void LogFunctionDetailsEvent(string siteName, string functionName, string inputBindings, string outputBindings, string scriptType, bool isDisabled)
@@ -85,6 +88,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics
 
         public override void LogFunctionExecutionEvent(string executionId, string siteName, int concurrency, string functionName, string invocationId, string executionStage, long executionTimeSpan, bool success)
         {
+          //  _metricsPublisher.AddFunctionExecutionActivity(functionName, invocationId, concurrency, executionStage, success, executionTimeSpan, DateTime.UtcNow);
         }
 
         private void ConsoleWriter(string evt)
@@ -93,6 +97,11 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics
             {
                 Console.WriteLine(evt);
             }
+        }
+
+        private void LogMetricsPublishEvent(LogLevel level, string message)
+        {
+            this.LogFunctionTraceEvent(level, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, message, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
         }
 
         public override void LogAzureMonitorDiagnosticLogEvent(LogLevel level, string resourceId, string operationName, string category, string regionName, string properties)
