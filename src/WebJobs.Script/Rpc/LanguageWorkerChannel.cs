@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -276,6 +277,54 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
         // send capabilities to worker, wait for WorkerInitResponse
         internal void SendWorkerInitRequest(RpcEvent startEvent)
         {
+            // JIT ToRPC
+            BindingMetadata bindingMetadataIn = new BindingMetadata()
+            {
+                Type = "httpTrigger",
+                Direction = BindingDirection.In,
+                Name = "req"
+            };
+
+            BindingMetadata bindingMetadataOut = new BindingMetadata()
+            {
+                Type = "http",
+                Direction = BindingDirection.Out,
+                Name = "res"
+            };
+
+            Collection<BindingMetadata> bindings = new Collection<BindingMetadata>()
+                {
+                    bindingMetadataIn,
+                    bindingMetadataOut
+                };
+
+            FunctionMetadata functionMetadata = new FunctionMetadata()
+            {
+                FunctionDirectory = @"D:\pgopaGit\azure-functions-nodejs-worker\test\end-to-end\testFunctionApp\HttpTrigger",
+                Language = "node",
+                Name = "HttpTrigger",
+                ScriptFile = @"D:\pgopaGit\azure-functions-nodejs-worker\test\end-to-end\testFunctionApp\HttpTrigger\index.js",
+                IsProxy = false,
+                IsDisabled = false,
+                IsDirect = false,
+                Bindings = bindings
+            };
+
+            ScriptInvocationContext scriptInvocationContext = new ScriptInvocationContext()
+            {
+                FunctionMetadata = functionMetadata,
+                ResultSource = new TaskCompletionSource<ScriptInvocationResult>()
+            };
+
+            var testInvokeRequest = GetTestHttpInvocationRequest(scriptInvocationContext);
+
+            _workerChannelLogger.LogDebug("Jitting ToRpc done:{FunctionId}", testInvokeRequest.FunctionId);
+
+            // JIT ToObject
+            TypedData testTypedData = GetTestRpcHttp();
+            testTypedData.ToObject();
+            _workerChannelLogger.LogDebug("Jitting ToObject done");
+
             _inboundWorkerEvents.Where(msg => msg.MessageType == MsgType.WorkerInitResponse)
                 .Timeout(workerInitTimeout)
                 .Take(1)
@@ -436,20 +485,7 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
         {
             try
             {
-                InvocationRequest invocationRequest = new InvocationRequest()
-                {
-                    FunctionId = context.FunctionMetadata.FunctionId,
-                    InvocationId = Guid.NewGuid().ToString(),
-                };
-
-                var headers = new HeaderDictionary();
-                headers.Add("content-type", "application/json");
-                HttpRequest request = CreateHttpRequest("GET", "http://localhost/api/httptrigger-scenarios", headers);
-                invocationRequest.InputData.Add(new ParameterBinding()
-                {
-                    Name = "testHttpRequest",
-                    Data = request.ToRpc(_workerChannelLogger)
-                });
+                InvocationRequest invocationRequest = GetTestHttpInvocationRequest(context);
                 _executingInvocations.TryAdd(invocationRequest.InvocationId, context);
                 SendStreamingMessage(new StreamingMessage
                 {
@@ -460,6 +496,30 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             {
                 context.ResultSource.TrySetException(invokeEx);
             }
+        }
+
+        private InvocationRequest GetTestHttpInvocationRequest(ScriptInvocationContext context)
+        {
+            InvocationRequest invocationRequest = new InvocationRequest()
+            {
+                FunctionId = context.FunctionMetadata.FunctionId,
+                InvocationId = Guid.NewGuid().ToString(),
+            };
+
+            invocationRequest.InputData.Add(new ParameterBinding()
+            {
+                Name = "testHttpRequest",
+                Data = GetTestRpcHttp()
+            });
+            return invocationRequest;
+        }
+
+        private TypedData GetTestRpcHttp()
+        {
+            var headers = new HeaderDictionary();
+            headers.Add("content-type", "application/json");
+            HttpRequest request = CreateHttpRequest("GET", "http://localhost/api/httptrigger-scenarios", headers);
+            return request.ToRpc(_workerChannelLogger);
         }
 
         public static HttpRequest CreateHttpRequest(string method, string uriString, IHeaderDictionary headers = null, object body = null)
