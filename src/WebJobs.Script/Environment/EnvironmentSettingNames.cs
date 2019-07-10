@@ -72,6 +72,5 @@ namespace Microsoft.Azure.WebJobs.Script
 
         public const string KubernetesServiceHost = "KUBERNETES_SERVICE_HOST";
         public const string KubernetesServiceHttpsPort = "KUBERNETES_SERVICE_PORT_HTTPS";
-        public const string MeshInitURI = "MESH_INIT_URI";
     }
 }
