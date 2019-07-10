@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -33,6 +34,9 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
         {
             byte[] bytes = TestHelpers.GenerateKeyBytes();
             var encryptionKey = Convert.ToBase64String(bytes);
+            
+            // Get java process Id before specialization
+            IEnumerable<int> nodeProcessesBefore = Process.GetProcessesByName("node").Select(p => p.Id);
 
             var vars = new Dictionary<string, string>
             {
@@ -53,12 +57,14 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
             // verify only the Warmup function is present
             // generally when in placeholder mode, the list API won't be called
             // but we're doing this for regression testing
-            var functions = await ListFunctions();
-            Assert.Equal(1, functions.Length);
-            Assert.Equal("WarmUp", functions[0]);
+            // var functions = await ListFunctions();
+            // Assert.Equal(1, functions.Length);
+            // Assert.Equal("WarmUp", functions[0]);
 
             await VerifyWarmupSucceeds();
             await VerifyWarmupSucceeds(restart: true);
+
+            IEnumerable<int> nodeProcessesBeforePh = Process.GetProcessesByName("node").Select(p => p.Id);
 
             // now specialize the site
             await Assign(encryptionKey);
@@ -84,12 +90,6 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
 
             Assert.False(environment.IsPlaceholderModeEnabled());
             Assert.True(environment.IsContainerReady());
-
-            // verify that after specialization the correct
-            // app content is returned
-            functions = await ListFunctions();
-            Assert.Equal(1, functions.Length);
-            Assert.Equal("HttpTrigger", functions[0]);
 
             // verify warmup function no longer there
             request = new HttpRequestMessage(HttpMethod.Get, "api/warmup");

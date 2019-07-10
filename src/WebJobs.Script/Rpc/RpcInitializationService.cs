@@ -70,14 +70,6 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
         internal Task InitializeChannelsAsync()
         {
             string workerRuntime = _environment.GetEnvironmentVariable(LanguageWorkerConstants.FunctionWorkerRuntimeSettingName);
-            if (_environment.IsLinuxAppServiceEnvironment())
-            {
-                return Task.CompletedTask;
-            }
-            if (_environment.IsLinuxContainerEnvironment())
-            {
-                return Task.CompletedTask;
-            }
             if (string.IsNullOrEmpty(workerRuntime) && _environment.IsPlaceholderModeEnabled())
             {
                 // Only warm up language workers in placeholder mode in worker runtime is not set
