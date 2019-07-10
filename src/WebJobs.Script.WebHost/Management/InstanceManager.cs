@@ -243,20 +243,29 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             if ((pkgContext.IsScmRunFromPackage() && await pkgContext.BlobExistsAsync(_logger)) ||
                 (!pkgContext.IsScmRunFromPackage() && !string.IsNullOrEmpty(pkgContext.Url) && pkgContext.Url != "1"))
             {
-                await ApplyBlobPackageContext(pkgContext.Url, options.ScriptPath);
+                ApplyBlobPackageContext(pkgContext.Url, options.ScriptPath);
             }
             else if (!string.IsNullOrEmpty(assignmentContext.AzureFilesConnectionString))
             {
-                await MountCifs(assignmentContext.AzureFilesConnectionString, assignmentContext.AzureFilesContentShare, "/home");
+                ApplyAzureFilesContext(assignmentContext.AzureFilesConnectionString, assignmentContext.AzureFilesContentShare, "/home");
             }
         }
 
-        private async Task ApplyBlobPackageContext(string blobUrl, string targetPath)
+        private void ApplyAzureFilesContext(string connectionString, string contentShare, string targetPath)
+        {
+            var sa = CloudStorageAccount.Parse(connectionString);
+            var key = Convert.ToBase64String(sa.Credentials.ExportKey());
+
+            var mountCommand = $"mount -t cifs //{sa.FileEndpoint.Host}/{contentShare} {targetPath} -o vers=3.0,username={sa.Credentials.AccountName},password={key},dir_mode=0777,file_mode=0777,serverino";
+            RunBashCommand($"(mkdir -p {targetPath} || true) && ({mountCommand}) && (mkdir -p /home/site/wwwroot || true)", MetricEventNames.LinuxContainerSpecializationAzureFilesMount);
+        }
+
+        private void ApplyBlobPackageContext(string blobUrl, string targetPath)
         {
             // download zip and extract
             var blobUri = new Uri(blobUrl);
             var filePath = Download(blobUri);
-            await UnpackPackage(filePath, targetPath);
+            UnpackPackage(filePath, targetPath);
 
             string bundlePath = Path.Combine(targetPath, "worker-bundle");
             if (Directory.Exists(bundlePath))
@@ -290,7 +299,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             return filePath;
         }
 
-        private async Task UnpackPackage(string filePath, string scriptPath)
+        private void UnpackPackage(string filePath, string scriptPath)
         {
             var packageType = GetPackageType(filePath);
 
@@ -303,7 +312,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
                 }
                 else
                 {
-                    await MountFuse("squashfs", filePath, scriptPath);
+                    MountFsImage(filePath, scriptPath);
                 }
             }
             else if (packageType == CodePackageType.Zip)
@@ -311,7 +320,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
                 // default to unzip for zip packages
                 if (_environment.IsMountEnabled())
                 {
-                    await MountFuse("zip", filePath, scriptPath);
+                    MountZipFile(filePath, scriptPath);
                 }
                 else
                 {
@@ -360,35 +369,37 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
         }
 
         private void UnsquashImage(string filePath, string scriptPath)
-            => RunBashCommand($"unsquashfs -f -d '{scriptPath}' '{filePath}'", MetricEventNames.LinuxContainerSpecializationUnsquash);
+            => RunBashCommand($"(mkdir -p '{scriptPath}' || true) && unsquashfs -f -d '{scriptPath}' '{filePath}'", MetricEventNames.LinuxContainerSpecializationUnsquash);
 
-        private async Task MountFuse(string type, string filePath, string scriptPath)
-            => await Mount(new[]
+        private void MountFsImage(string filePath, string scriptPath)
+            => RunFuseMount($"squashfuse_ll -o nonempty '{filePath}' '{scriptPath}'", scriptPath);
+
+        private void MountZipFile(string filePath, string scriptPath)
+            => RunFuseMount($"fuse-zip -o nonempty -r '{filePath}' '{scriptPath}'", scriptPath);
+
+        private void RunFuseMount(string mountCommand, string targetPath)
+        {
+            var bashCommand = $"(mknod /dev/fuse c 10 229 || true) && (mkdir -p '{targetPath}' || true) && ({mountCommand})";
+            var process = new Process
             {
-                new KeyValuePair<string, string>("operation", type),
-                new KeyValuePair<string, string>("filePath", filePath),
-                new KeyValuePair<string, string>("targetPath", scriptPath),
-            });
-
-        private async Task MountCifs(string connectionString, string contentShare, string targetPath)
-        {
-            var sa = CloudStorageAccount.Parse(connectionString);
-            var key = Convert.ToBase64String(sa.Credentials.ExportKey());
-            await Mount(new[]
-           {
-                new KeyValuePair<string, string>("operation", "cifs"),
-                new KeyValuePair<string, string>("host", sa.FileEndpoint.Host),
-                new KeyValuePair<string, string>("accountName", sa.Credentials.AccountName),
-                new KeyValuePair<string, string>("accountKey", key),
-                new KeyValuePair<string, string>("contentShare", contentShare),
-                new KeyValuePair<string, string>("targetPath", targetPath),
-            });
-        }
-
-        private async Task Mount(IEnumerable<KeyValuePair<string, string>> formData)
-        {
-            var res = await _client.PostAsync(_environment.GetEnvironmentVariable(EnvironmentSettingNames.MeshInitURI), new FormUrlEncodedContent(formData));
-            _logger.LogInformation("Response {res} from init", res);
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "bash",
+                    Arguments = $"-c \"{bashCommand}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            _logger.LogInformation($"Running: {process.StartInfo.FileName} {process.StartInfo.Arguments}");
+            process.Start();
+            var output = process.StandardOutput.ReadToEnd();
+            var error = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            _logger.LogInformation($"Output: {output}");
+            _logger.LogInformation($"error: {output}");
+            _logger.LogInformation($"exitCode: {process.ExitCode}");
         }
 
         private (string, string, int) RunBashCommand(string command, string metricName)
