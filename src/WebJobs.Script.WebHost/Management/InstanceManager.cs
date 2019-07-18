@@ -379,27 +379,30 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
 
         private void RunFuseMount(string mountCommand, string targetPath)
         {
-            var bashCommand = $"(mknod /dev/fuse c 10 229 || true) && (mkdir -p '{targetPath}' || true) && ({mountCommand})";
-            var process = new Process
+            using (_metricsLogger.LatencyEvent(MetricEventNames.LinuxContainerSpecializationFuseMount))
             {
-                StartInfo = new ProcessStartInfo
+                var bashCommand = $"(mknod /dev/fuse c 10 229 || true) && (mkdir -p '{targetPath}' || true) && ({mountCommand})";
+                var process = new Process
                 {
-                    FileName = "bash",
-                    Arguments = $"-c \"{bashCommand}\"",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
-            _logger.LogInformation($"Running: {process.StartInfo.FileName} {process.StartInfo.Arguments}");
-            process.Start();
-            var output = process.StandardOutput.ReadToEnd();
-            var error = process.StandardError.ReadToEnd();
-            process.WaitForExit();
-            _logger.LogInformation($"Output: {output}");
-            _logger.LogInformation($"error: {output}");
-            _logger.LogInformation($"exitCode: {process.ExitCode}");
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "bash",
+                        Arguments = $"-c \"{bashCommand}\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+                _logger.LogInformation($"Running: {process.StartInfo.FileName} {process.StartInfo.Arguments}");
+                process.Start();
+                var output = process.StandardOutput.ReadToEnd();
+                var error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                _logger.LogInformation($"Output: {output}");
+                _logger.LogInformation($"error: {output}");
+                _logger.LogInformation($"exitCode: {process.ExitCode}");
+            }
         }
 
         private (string, string, int) RunBashCommand(string command, string metricName)
