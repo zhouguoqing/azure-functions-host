@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs.Script.WebHost.Management;
 using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authorization.Policies;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
 {
@@ -21,7 +22,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
         private readonly IEnvironment _environment;
         private readonly IInstanceManager _instanceManager;
 
-        public InstanceController(IEnvironment environment, IInstanceManager instanceManager)
+        public InstanceController(IEnvironment environment, IInstanceManager instanceManager, ILoggerFactory loggerFactory)
         {
             _environment = environment;
             _instanceManager = instanceManager;
@@ -33,11 +34,13 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
         public async Task<IActionResult> Assign([FromBody] EncryptedHostAssignmentContext encryptedAssignmentContext)
         {
             var containerKey = _environment.GetEnvironmentVariable(EnvironmentSettingNames.ContainerEncryptionKey);
-            var assignmentContext = encryptedAssignmentContext.Decrypt(containerKey);
+            var assignmentContext = encryptedAssignmentContext.IsWarmup
+                ? null
+                : encryptedAssignmentContext.Decrypt(containerKey);
 
             // before starting the assignment we want to perform as much
             // up front validation on the context as possible
-            string error = await _instanceManager.ValidateContext(assignmentContext);
+            string error = await _instanceManager.ValidateContext(assignmentContext, encryptedAssignmentContext.IsWarmup);
             if (error != null)
             {
                 return StatusCode(StatusCodes.Status400BadRequest, error);
@@ -45,15 +48,15 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
 
             // Wait for Sidecar specialization to complete before returning ok.
             // This shouldn't take too long so ok to do this sequentially.
-            error = await _instanceManager.SpecializeMSISidecar(assignmentContext);
+            error = await _instanceManager.SpecializeMSISidecar(assignmentContext, encryptedAssignmentContext.IsWarmup);
             if (error != null)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, error);
             }
 
-            var result = _instanceManager.StartAssignment(assignmentContext);
+            var result = _instanceManager.StartAssignment(assignmentContext, encryptedAssignmentContext.IsWarmup);
 
-            return result
+            return result || encryptedAssignmentContext.IsWarmup
                 ? Accepted()
                 : StatusCode(StatusCodes.Status409Conflict, "Instance already assigned");
         }

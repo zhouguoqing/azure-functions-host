@@ -43,8 +43,13 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             _optionsFactory = optionsFactory ?? throw new ArgumentNullException(nameof(optionsFactory));
         }
 
-        public async Task<string> SpecializeMSISidecar(HostAssignmentContext context)
+        public async Task<string> SpecializeMSISidecar(HostAssignmentContext context, bool isWarmup)
         {
+            if (isWarmup)
+            {
+                return null;
+            }
+
             string endpoint;
             var msiEnabled = context.IsMSIEnabled(out endpoint);
 
@@ -81,7 +86,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             return null;
         }
 
-        public bool StartAssignment(HostAssignmentContext context)
+        public bool StartAssignment(HostAssignmentContext context, bool isWarmup)
         {
             if (!_webHostEnvironment.InStandbyMode)
             {
@@ -89,7 +94,11 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
                 return false;
             }
 
-            if (_assignmentContext == null)
+            if (isWarmup)
+            {
+                return true;
+            }
+            else if (_assignmentContext == null)
             {
                 lock (_assignmentLock)
                 {
@@ -122,8 +131,12 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             }
         }
 
-        public Task<string> ValidateContext(HostAssignmentContext assignmentContext)
+        public async Task<string> ValidateContext(HostAssignmentContext assignmentContext, bool isWarmup)
         {
+            if (isWarmup)
+            {
+                return null;
+            }
             _logger.LogInformation($"Validating host assignment context (SiteId: {assignmentContext.SiteId}, SiteName: '{assignmentContext.SiteName}')");
             RunFromPackageContext pkgContext = assignmentContext.GetRunFromPkgContext();
             _logger.LogInformation($"Will be using {pkgContext.EnvironmentVariableName} app setting as zip url");
@@ -131,29 +144,35 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             if (pkgContext.IsScmRunFromPackage())
             {
                 // Not user assigned so limit validation
-                return Task.FromResult<string>(null);
+                return null;
             }
             else if (!string.IsNullOrEmpty(pkgContext.Url) && pkgContext.Url != "1")
             {
                 // In AppService, ZipUrl == 1 means the package is hosted in azure files.
                 // Otherwise we expect zipUrl to be a blobUri to a zip or a squashfs image
-                return ValidateBlobPackageContext(pkgContext.Url);
+                (var error, var contentLength) = await ValidateBlobPackageContext(pkgContext.Url);
+                if (string.IsNullOrEmpty(error))
+                {
+                    assignmentContext.PackageContentLength = contentLength;
+                }
+                return error;
             }
             else if (!string.IsNullOrEmpty(assignmentContext.AzureFilesConnectionString))
             {
-                return ValidateAzureFilesContext(assignmentContext.AzureFilesConnectionString, assignmentContext.AzureFilesContentShare);
+                return await ValidateAzureFilesContext(assignmentContext.AzureFilesConnectionString, assignmentContext.AzureFilesContentShare);
             }
             else
             {
                 _logger.LogError($"Missing ZipUrl and AzureFiles config. Continue with empty root.");
-                return Task.FromResult<string>(null);
+                return null;
             }
         }
 
-        private async Task<string> ValidateBlobPackageContext(string blobUri)
+        private async Task<(string, long?)> ValidateBlobPackageContext(string blobUri)
         {
             string error = null;
             HttpResponseMessage response = null;
+            long? contentLength = null;
             try
             {
                 if (!string.IsNullOrEmpty(blobUri))
@@ -168,6 +187,10 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
                                 var request = new HttpRequestMessage(HttpMethod.Head, blobUri);
                                 response = await _client.SendAsync(request);
                                 response.EnsureSuccessStatusCode();
+                                if (response.Content != null && response.Content.Headers != null)
+                                {
+                                    contentLength = response.Content.Headers.ContentLength;
+                                }
                             }
                         }
                         catch (Exception e)
@@ -184,7 +207,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
                 _logger.LogError(e, "ValidateContext failed");
             }
 
-            return error;
+            return (error, contentLength);
         }
 
         private async Task<string> ValidateAzureFilesContext(string connectionString, string contentShare)
@@ -243,7 +266,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             if ((pkgContext.IsScmRunFromPackage() && await pkgContext.BlobExistsAsync(_logger)) ||
                 (!pkgContext.IsScmRunFromPackage() && !string.IsNullOrEmpty(pkgContext.Url) && pkgContext.Url != "1"))
             {
-                ApplyBlobPackageContext(pkgContext.Url, options.ScriptPath);
+                await ApplyBlobPackageContext(pkgContext, options.ScriptPath);
             }
             else if (!string.IsNullOrEmpty(assignmentContext.AzureFilesConnectionString))
             {
@@ -260,12 +283,11 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             RunBashCommand($"(mkdir -p {targetPath} || true) && ({mountCommand}) && (mkdir -p /home/site/wwwroot || true)", MetricEventNames.LinuxContainerSpecializationAzureFilesMount);
         }
 
-        private void ApplyBlobPackageContext(string blobUrl, string targetPath)
+        private async Task ApplyBlobPackageContext(RunFromPackageContext pkgContext, string targetPath)
         {
             // download zip and extract
-            var blobUri = new Uri(blobUrl);
-            var filePath = Download(blobUri);
-            UnpackPackage(filePath, targetPath);
+            var filePath = await Download(pkgContext);
+            UnpackPackage(filePath, targetPath, pkgContext);
 
             string bundlePath = Path.Combine(targetPath, "worker-bundle");
             if (Directory.Exists(bundlePath))
@@ -274,8 +296,9 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             }
         }
 
-        private string Download(Uri zipUri)
+        private async Task<string> Download(RunFromPackageContext pkgContext)
         {
+            var zipUri = new Uri(pkgContext.Url);
             if (!Utility.TryCleanUrl(zipUri.AbsoluteUri, out string cleanedUrl))
             {
                 throw new Exception("Invalid url for the package");
@@ -284,24 +307,74 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             var tmpPath = Path.GetTempPath();
             var fileName = Path.GetFileName(zipUri.AbsolutePath);
             var filePath = Path.Combine(tmpPath, fileName);
-            _logger.LogInformation($"Downloading zip contents from '{cleanedUrl}' to temp file '{filePath}'");
+            if (pkgContext.PackageContentLength != null && pkgContext.PackageContentLength > 100 * 1024 * 1024)
+            {
+                _logger.LogInformation($"Downloading zip contents from '{cleanedUrl}' using aria2c'");
+                AriaDownload(tmpPath, fileName, zipUri);
+            }
+            else
+            {
+                _logger.LogInformation($"Downloading zip contents from '{cleanedUrl}' using httpclient'");
+                await HttpClientDownload(filePath, zipUri);
+            }
 
-            (string stdout, string stderr, int exitCode) = RunBashCommand($"aria2c --allow-overwrite -x12 -d {tmpPath} -o {fileName} '{zipUri}'", MetricEventNames.LinuxContainerSpecializationZipDownload);
+            return filePath;
+        }
+
+        private async Task HttpClientDownload(string filePath, Uri zipUri)
+        {
+            HttpResponseMessage response = null;
+            await Utility.InvokeWithRetriesAsync(async () =>
+            {
+                try
+                {
+                    using (_metricsLogger.LatencyEvent(MetricEventNames.LinuxContainerSpecializationZipDownload))
+                    {
+                        var request = new HttpRequestMessage(HttpMethod.Get, zipUri);
+                        response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        response.EnsureSuccessStatusCode();
+                    }
+                }
+                catch (Exception e)
+                {
+                    string error = $"Error downloading zip content";
+                    _logger.LogError(e, error);
+                    throw;
+                }
+                _logger.LogInformation($"{response.Content.Headers.ContentLength} bytes downloaded");
+            }, 2, TimeSpan.FromSeconds(0.5));
+
+            using (_metricsLogger.LatencyEvent(MetricEventNames.LinuxContainerSpecializationZipWrite))
+            {
+                using (var content = await response.Content.ReadAsStreamAsync())
+                using (var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true))
+                {
+                    await content.CopyToAsync(stream);
+                }
+                _logger.LogInformation($"{response.Content.Headers.ContentLength} bytes written");
+            }
+        }
+
+        private void AriaDownload(string directory, string fileName, Uri zipUri)
+        {
+            (string stdout, string stderr, int exitCode) = RunBashCommand($"aria2c --allow-overwrite -x12 -d {directory} -o {fileName} '{zipUri}'", MetricEventNames.LinuxContainerSpecializationZipDownload);
             if (exitCode != 0)
             {
                 var msg = $"Error downloading package. stdout: {stdout}, stderr: {stderr}, exitCode: {exitCode}";
                 _logger.LogError(msg);
                 throw new InvalidOperationException(msg);
             }
-            var fileInfo = FileUtility.FileInfoFromFileName(filePath);
+            var fileInfo = FileUtility.FileInfoFromFileName(Path.Combine(directory, fileName));
             _logger.LogInformation($"{fileInfo.Length} bytes downloaded");
-
-            return filePath;
         }
 
-        private void UnpackPackage(string filePath, string scriptPath)
+        private void UnpackPackage(string filePath, string scriptPath, RunFromPackageContext pkgContext)
         {
-            var packageType = GetPackageType(filePath);
+            CodePackageType packageType;
+            using (_metricsLogger.LatencyEvent(MetricEventNames.LinuxContainerSpecializationGetPackageType))
+            {
+                packageType = GetPackageType(filePath, pkgContext);
+            }
 
             if (packageType == CodePackageType.Squashfs)
             {
@@ -329,8 +402,25 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             }
         }
 
-        private CodePackageType GetPackageType(string filePath)
+        private CodePackageType GetPackageType(string filePath, RunFromPackageContext pkgContext)
         {
+            // cloud build always builds squashfs
+            if (pkgContext.IsScmRunFromPackage())
+            {
+                return CodePackageType.Squashfs;
+            }
+
+            var uri = new Uri(pkgContext.Url);
+            // check file name since it'll be faster than running `file`
+            if (FileIsAny(".squashfs", ".sfs", ".sqsh", ".img", ".fs"))
+            {
+                return CodePackageType.Squashfs;
+            }
+            else if (FileIsAny(".zip"))
+            {
+                return CodePackageType.Zip;
+            }
+
             // Check file magic-number using `file` command.
             (var output, _, _) = RunBashCommand($"file -b {filePath}", MetricEventNames.LinuxContainerSpecializationFileCommand);
             if (output.StartsWith("Squashfs", StringComparison.OrdinalIgnoreCase))
@@ -341,21 +431,13 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             {
                 return CodePackageType.Zip;
             }
-            else if (FileIsAny(".squashfs", ".sfs", ".sqsh", ".img", ".fs"))
-            {
-                return CodePackageType.Squashfs;
-            }
-            else if (FileIsAny(".zip"))
-            {
-                return CodePackageType.Zip;
-            }
             else
             {
                 throw new InvalidOperationException($"Can't find CodePackageType to match {filePath}");
             }
 
             bool FileIsAny(params string[] options)
-                => options.Any(o => filePath.EndsWith(o, StringComparison.OrdinalIgnoreCase));
+                => options.Any(o => uri.AbsolutePath.EndsWith(o, StringComparison.OrdinalIgnoreCase));
         }
 
         private void UnzipPackage(string filePath, string scriptPath)
