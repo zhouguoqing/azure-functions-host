@@ -28,11 +28,11 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
         {
             {
                 OSPlatform.Windows,
-                new List<string>() { LanguageWorkerConstants.JavaLanguageWorkerName }
+                new List<string>() { LanguageWorkerConstants.NodeLanguageWorkerName }
             },
             {
                 OSPlatform.Linux,
-                new List<string>() { LanguageWorkerConstants.PythonLanguageWorkerName }
+                new List<string>() { LanguageWorkerConstants.NodeLanguageWorkerName }
             }
         };
 
@@ -114,13 +114,19 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
         internal Task InitializeChannelsAsync()
         {
             if (ShouldStartInPlaceholderMode())
+            {
+                return InitializePlaceholderChannelsAsync();
+            }
+
             return InitializeWebHostRuntimeChannelsAsync();
         }
 
         private Task InitializePlaceholderChannelsAsync()
+        {
             if (_environment.IsLinuxHostingEnvironment())
             {
                 return InitializePlaceholderChannelsAsync(OSPlatform.Linux);
+            }
 
             return InitializePlaceholderChannelsAsync(OSPlatform.Windows);
         }

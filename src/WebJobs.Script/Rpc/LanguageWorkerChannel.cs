@@ -389,7 +389,7 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             var headers = new HeaderDictionary();
             headers.Add("content-type", "application/json");
             HttpRequest request = CreateHttpRequest("GET", "http://localhost/api/httptrigger-scenarios", headers);
-            return request.ToRpc(_workerChannelLogger);
+            return request.ToRpc(_workerChannelLogger, _workerCapabilities);
         }
 
         public static HttpRequest CreateHttpRequest(string method, string uriString, IHeaderDictionary headers = null, object body = null)
@@ -408,7 +408,6 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             if (!string.IsNullOrEmpty(uri.Host))
             {
                 headers.Add("Host", uri.Host);
-                            Data = input.val.ToRpc(_workerChannelLogger, _workerCapabilities)
             }
 
             if (body != null)

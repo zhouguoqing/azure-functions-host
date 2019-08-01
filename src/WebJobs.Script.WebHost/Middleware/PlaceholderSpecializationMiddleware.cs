@@ -28,17 +28,17 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
         private RequestDelegate _invoke;
         private double _specialized = 0;
 
-        private ILanguageWorkerChannelManager _languageWorkerChannelManager;
+        private IWebHostLanguageWorkerChannelManager _webHostlanguageWorkerChannelManager;
 
         public PlaceholderSpecializationMiddleware(RequestDelegate next, IScriptWebHostEnvironment webHostEnvironment,
-            IStandbyManager standbyManager, IEnvironment environment, ILanguageWorkerChannelManager languageWorkerChannelManager)
+            IStandbyManager standbyManager, IEnvironment environment, IWebHostLanguageWorkerChannelManager webHostLanguageWorkerChannelManager)
         {
             _next = next;
             _invoke = InvokeSpecializationCheck;
             _webHostEnvironment = webHostEnvironment;
             _standbyManager = standbyManager;
             _environment = environment;
-            _languageWorkerChannelManager = languageWorkerChannelManager;
+            _webHostlanguageWorkerChannelManager = webHostLanguageWorkerChannelManager;
         }
 
         public async Task Invoke(HttpContext httpContext)
@@ -50,7 +50,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
         {
             if (!_webHostEnvironment.InStandbyMode && _environment.IsContainerReady())
             {
-                ILanguageWorkerChannel channel = _languageWorkerChannelManager.GetChannels("node").FirstOrDefault();
+                ILanguageWorkerChannel channel = _webHostlanguageWorkerChannelManager.GetChannels("node").FirstOrDefault();
                 BindingMetadata bindingMetadataIn = new BindingMetadata()
                 {
                     Type = "httpTrigger",
