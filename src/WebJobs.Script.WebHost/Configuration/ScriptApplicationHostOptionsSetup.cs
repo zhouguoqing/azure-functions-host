@@ -25,7 +25,10 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Configuration
             _standbyOptions = standbyOptions ?? throw new ArgumentNullException(nameof(standbyOptions));
 
             // If standby options change, invalidate this options cache.
-            _standbyOptionsOnChangeSubscription = _standbyOptions.OnChange(o => _cache.Clear());
+            _standbyOptionsOnChangeSubscription = _standbyOptions.OnChange(o =>
+            {
+                _cache.Clear();
+            });
         }
 
         public void Configure(ScriptApplicationHostOptions options)

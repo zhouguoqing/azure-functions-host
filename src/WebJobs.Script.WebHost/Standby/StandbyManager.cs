@@ -80,15 +80,21 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             // DateTime caches timezone information, so we need to clear the cache.
             TimeZoneInfo.ClearCachedData();
 
-            // Trigger a configuration reload to pick up all current settings
-            _configuration?.Reload();
-
-            _hostNameProvider.Reset();
-
             //await _languageWorkerChannelManager.SpecializeAsync();
             NotifyChange();
             await _scriptHostManager.RestartHostAsync();
             await _scriptHostManager.DelayUntilHostReady();
+        }
+
+        public void SpecializeHostReloadConfig()
+        {
+            // Go async immediately to ensure that any async context from
+            // the PlaceholderSpecializationMiddleware is properly suppressed.
+            _logger.LogInformation("Reloading config");
+            // Trigger a configuration reload to pick up all current settings
+            _configuration?.Reload();
+            _hostNameProvider.Reset();
+            NotifyChange();
         }
 
         public void NotifyChange()
@@ -169,11 +175,11 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
         {
             if (!_webHostEnvironment.InStandbyMode && _environment.IsContainerReady())
             {
-                _specializationTimer?.Dispose();
-                _specializationTimer = null;
+                //_specializationTimer?.Dispose();
+                //_specializationTimer = null;
 
-                SpecializeHostAsync().ContinueWith(t => _logger.LogError(t.Exception, "Error specializing host."),
-                    TaskContinuationOptions.OnlyOnFaulted);
+                //SpecializeHostAsync().ContinueWith(t => _logger.LogError(t.Exception, "Error specializing host."),
+                //    TaskContinuationOptions.OnlyOnFaulted);
             }
         }
 

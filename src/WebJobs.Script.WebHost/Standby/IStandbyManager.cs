@@ -12,5 +12,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
         Task InitializeAsync();
 
         Task SpecializeHostAsync();
+
+        void SpecializeHostReloadConfig();
     }
 }

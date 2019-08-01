@@ -1,20 +1,18 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Azure.WebJobs.Script.Binding;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.Rpc;
+using Microsoft.Extensions.Options;
 using FunctionMetadata = Microsoft.Azure.WebJobs.Script.Description.FunctionMetadata;
 
 namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
@@ -25,13 +23,14 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
         private readonly IScriptWebHostEnvironment _webHostEnvironment;
         private readonly IStandbyManager _standbyManager;
         private readonly IEnvironment _environment;
+        private readonly IOptionsMonitor<ScriptApplicationHostOptions> _options;
         private RequestDelegate _invoke;
         private double _specialized = 0;
 
         private IWebHostLanguageWorkerChannelManager _webHostlanguageWorkerChannelManager;
 
         public PlaceholderSpecializationMiddleware(RequestDelegate next, IScriptWebHostEnvironment webHostEnvironment,
-            IStandbyManager standbyManager, IEnvironment environment, IWebHostLanguageWorkerChannelManager webHostLanguageWorkerChannelManager)
+            IStandbyManager standbyManager, IEnvironment environment, IWebHostLanguageWorkerChannelManager webHostLanguageWorkerChannelManager, IOptionsMonitor<ScriptApplicationHostOptions> options)
         {
             _next = next;
             _invoke = InvokeSpecializationCheck;
@@ -39,6 +38,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
             _standbyManager = standbyManager;
             _environment = environment;
             _webHostlanguageWorkerChannelManager = webHostLanguageWorkerChannelManager;
+            _options = options;
         }
 
         public async Task Invoke(HttpContext httpContext)
@@ -50,9 +50,10 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
         {
             if (!_webHostEnvironment.InStandbyMode && _environment.IsContainerReady())
             {
+                _standbyManager.SpecializeHostReloadConfig();
+                string scriptPath = _options.CurrentValue.ScriptPath;
                 ILanguageWorkerChannel channel = _webHostlanguageWorkerChannelManager.GetChannels("node").FirstOrDefault();
                 await channel.SendFunctionEnvironmentReloadRequest();
-
                 BindingMetadata bindingMetadataIn = new BindingMetadata()
                 {
                     Type = "httpTrigger",
@@ -75,15 +76,24 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
 
                 FunctionMetadata functionMetadata = new FunctionMetadata()
                 {
-                    FunctionDirectory = @"D:\pgopaGit\azure-functions-nodejs-worker\test\end-to-end\testFunctionApp\HttpTrigger",
+                    FunctionDirectory = $"{scriptPath}\\HttpTrigger",
                     Language = "node",
                     Name = "HttpTrigger",
-                    ScriptFile = @"D:\pgopaGit\azure-functions-nodejs-worker\test\end-to-end\testFunctionApp\HttpTrigger\index.js",
+                    ScriptFile = $"{scriptPath}\\HttpTrigger\\index.js",
                     IsProxy = false,
                     IsDisabled = false,
                     IsDirect = false,
                     Bindings = bindings
                 };
+
+                List<FunctionMetadata> functions = new List<FunctionMetadata>()
+                {
+                    functionMetadata
+                };
+                channel.SetupFunctionInvocationBuffers(functions);
+                TaskCompletionSource<bool> loadTask = new TaskCompletionSource<bool>();
+                channel.SendFunctionLoadRequest(functionMetadata, loadTask);
+                await loadTask.Task;
 
                 ScriptInvocationContext scriptInvocationContext = new ScriptInvocationContext()
                 {
