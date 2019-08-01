@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Microsoft.ApplicationInsights.DependencyCollector;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.Azure.WebJobs.Host.Executors;
@@ -123,6 +124,7 @@ namespace Microsoft.Azure.WebJobs.Script
                 // Core WebJobs/Script Host services
                 services.AddSingleton<ScriptHost>();
                 services.AddSingleton<IFunctionDispatcher, FunctionDispatcher>();
+                services.AddSingleton<IJobHostLanguageWorkerChannelManager, JobHostLanguageWorkerChannelManager>();
                 services.AddSingleton<IFunctionDispatcherLoadBalancer, FunctionDispatcherLoadBalancer>();
                 services.AddSingleton<IScriptJobHost>(p => p.GetRequiredService<ScriptHost>());
                 services.AddSingleton<IJobHost>(p => p.GetRequiredService<ScriptHost>());
@@ -164,7 +166,6 @@ namespace Microsoft.Azure.WebJobs.Script
                     AddCommonServices(services);
                 }
 
-                services.AddSingleton<IHostedService, LanguageWorkerConsoleLogService>();
                 services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, PrimaryHostCoordinator>());
             });
 
@@ -184,16 +185,19 @@ namespace Microsoft.Azure.WebJobs.Script
 
             // Add Language Worker Service
             // Need to maintain the order: Add RpcInitializationService before core script host services
-            services.AddSingleton<IHostedService, RpcInitializationService>();
+            services.AddManagedHostedService<RpcInitializationService>();
             services.AddSingleton<FunctionRpc.FunctionRpcBase, FunctionRpcService>();
             services.AddSingleton<IRpcServer, GrpcServer>();
-            services.TryAddSingleton<ILanguageWorkerConsoleLogSource, LanguageWorkerConsoleLogSource>();
-            services.TryAddSingleton<ILanguageWorkerChannelManager, LanguageWorkerChannelManager>();
+            services.AddSingleton<IWorkerProcessFactory, DefaultWorkerProcessFactory>();
+            services.AddSingleton<ILanguageWorkerProcessFactory, LanguageWorkerProcessFactory>();
+            services.AddSingleton<ILanguageWorkerChannelFactory, LanguageWorkerChannelFactory>();
+            services.TryAddSingleton<IWebHostLanguageWorkerChannelManager, WebHostLanguageWorkerChannelManager>();
             services.TryAddSingleton<IDebugManager, DebugManager>();
             services.TryAddSingleton<IDebugStateProvider, DebugStateProvider>();
             services.TryAddSingleton<IEnvironment>(SystemEnvironment.Instance);
             services.TryAddSingleton<HostPerformanceManager>();
             services.ConfigureOptions<HostHealthMonitorOptionsSetup>();
+            AddProcessRegistry(services);
         }
 
         public static IWebJobsBuilder UseScriptExternalStartup(this IWebJobsBuilder builder, string rootScriptPath, IExtensionBundleManager extensionBundleManager)
@@ -238,7 +242,7 @@ namespace Microsoft.Azure.WebJobs.Script
             // Initializing AppInsights services during placeholder mode as well to avoid the cost of JITting these objects during specialization
             if (!string.IsNullOrEmpty(appInsightsKey) || SystemEnvironment.Instance.IsPlaceholderModeEnabled())
             {
-                builder.AddApplicationInsights(o => o.InstrumentationKey = appInsightsKey);
+                builder.AddApplicationInsightsWebJobs(o => o.InstrumentationKey = appInsightsKey);
                 builder.Services.ConfigureOptions<ApplicationInsightsLoggerOptionsSetup>();
 
                 builder.Services.AddSingleton<ISdkVersionProvider, FunctionsSdkVersionProvider>();
@@ -284,6 +288,20 @@ namespace Microsoft.Azure.WebJobs.Script
                     services.AddSingleton<IFuncAppFileProvisionerFactory, FuncAppFileProvisionerFactory>();
                     services.AddSingleton<IHostedService, FuncAppFileProvisioningService>();
                 });
+            }
+        }
+
+        private static void AddProcessRegistry(IServiceCollection services)
+        {
+            // W3WP already manages job objects
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                && !ScriptSettingsManager.Instance.IsAppServiceEnvironment)
+            {
+                services.AddSingleton<IProcessRegistry, JobObjectRegistry>();
+            }
+            else
+            {
+                services.AddSingleton<IProcessRegistry, EmptyProcessRegistry>();
             }
         }
     }

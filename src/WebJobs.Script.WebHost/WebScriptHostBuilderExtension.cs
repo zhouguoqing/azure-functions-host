@@ -34,6 +34,9 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                     // must happen before the script host is added below
                     services.ConfigureOptions<HttpOptionsSetup>();
                     services.ConfigureOptions<HostHstsOptionsSetup>();
+
+                    // Add logging service early.
+                    services.AddSingleton<IHostedService, DeferredLoggerService>();
                 })
                 .AddScriptHost(webHostOptions, configLoggerFactory, webJobsBuilder =>
                 {
@@ -69,7 +72,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
 
                     services.AddSingleton<HttpRequestQueue>();
                     services.AddSingleton<IHostLifetime, JobHostHostLifetime>();
-                    services.TryAddSingleton<IWebJobsExceptionHandler, WebScriptHostExceptionHandler>();
+                    services.AddSingleton<IWebJobsExceptionHandler, WebScriptHostExceptionHandler>();
                     services.AddSingleton<IScriptJobHostEnvironment, WebScriptJobHostEnvironment>();
 
                     services.AddSingleton<DefaultScriptWebHookProvider>();
@@ -92,6 +95,8 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                     // Hosted services
                     services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, HttpInitializationService>());
                     services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FileMonitoringService>());
+
+                    ConfigureRegisteredBuilders(services, rootServiceProvider);
                 });
 
             var debugStateProvider = rootServiceProvider.GetService<IDebugStateProvider>();

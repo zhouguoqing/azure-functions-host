@@ -32,14 +32,15 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
         private readonly ScriptApplicationHostOptions _hostOptions;
         private readonly TestServer _testServer;
         private readonly string _appRoot;
-        private readonly TestLoggerProvider _webHostLoggerProvider = new TestLoggerProvider();
         private readonly TestLoggerProvider _scriptHostLoggerProvider = new TestLoggerProvider();
         private readonly WebJobsScriptHostService _hostService;
 
         public TestFunctionHost(string scriptPath, string logPath,
-            Action<IWebJobsBuilder> configureJobHost = null,
-            Action<IConfigurationBuilder> configureAppConfiguration = null,
-            Action<IServiceCollection> configureServices = null)
+            Action<IServiceCollection> configureWebHostServices = null,
+            Action<IWebJobsBuilder> configureScriptHostWebJobsBuilder = null,
+            Action<IConfigurationBuilder> configureScriptHostAppConfiguration = null,
+            Action<ILoggingBuilder> configureScriptHostLogging = null,
+            Action<IServiceCollection> configureScriptHostServices = null)
         {
             _appRoot = scriptPath;
 
@@ -54,43 +55,49 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
 
             var optionsMonitor = TestHelpers.CreateOptionsMonitor(_hostOptions);
             var builder = new WebHostBuilder()
+                .ConfigureServices(services =>
+                {
+                    services.Replace(new ServiceDescriptor(typeof(ISecretManagerProvider), new TestSecretManagerProvider(new TestSecretManager())));
+                    services.Replace(ServiceDescriptor.Singleton<IServiceProviderFactory<IServiceCollection>>(new WebHostServiceProviderFactory()));
+                    services.Replace(new ServiceDescriptor(typeof(IOptions<ScriptApplicationHostOptions>), new OptionsWrapper<ScriptApplicationHostOptions>(_hostOptions)));
+                    services.Replace(new ServiceDescriptor(typeof(IOptionsMonitor<ScriptApplicationHostOptions>), optionsMonitor));
+
+                    // Allows us to configure services as the last step, thereby overriding anything
+                    services.AddSingleton(new PostConfigureServices(configureWebHostServices));
+                })
                 .ConfigureLogging(b =>
                 {
-                    b.AddProvider(_webHostLoggerProvider);
+                    b.AddDefaultWebJobsFilters();
+                    b.AddDeferred();
                 })
-                .ConfigureServices(services =>
-                  {
-                      services.Replace(new ServiceDescriptor(typeof(ISecretManagerProvider), new TestSecretManagerProvider(new TestSecretManager())));
-                      services.Replace(ServiceDescriptor.Singleton<IServiceProviderFactory<IServiceCollection>>(new WebHostServiceProviderFactory()));
-                      services.Replace(new ServiceDescriptor(typeof(IOptions<ScriptApplicationHostOptions>), new OptionsWrapper<ScriptApplicationHostOptions>(_hostOptions)));
-                      services.Replace(new ServiceDescriptor(typeof(IOptionsMonitor<ScriptApplicationHostOptions>), optionsMonitor));
-
-                      services.AddSingleton<IConfigureBuilder<IConfigurationBuilder>>(_ => new DelegatedConfigureBuilder<IConfigurationBuilder>(c =>
-                      {
-                          c.AddTestSettings();
-                          configureAppConfiguration?.Invoke(c);
-                      }));
-
-                      configureServices?.Invoke(services);
-                  })
-                  .AddScriptHostBuilder(webJobsBuilder =>
-                  {
-                      webJobsBuilder.Services.AddLogging(loggingBuilder =>
-                      {
-                          loggingBuilder.AddProvider(_scriptHostLoggerProvider);
-                          loggingBuilder.AddFilter<TestLoggerProvider>(_ => true);
-                      });
-
-                      webJobsBuilder.AddAzureStorage();
-
-                      configureJobHost?.Invoke(webJobsBuilder);
-                  })
-                  .UseStartup<Startup>();
+                .ConfigureScriptHostWebJobsBuilder(scriptHostWebJobsBuilder =>
+                {
+                    scriptHostWebJobsBuilder.AddAzureStorage();
+                    configureScriptHostWebJobsBuilder?.Invoke(scriptHostWebJobsBuilder);
+                })
+                .ConfigureScriptHostAppConfiguration(scriptHostConfigurationBuilder =>
+                {
+                    scriptHostConfigurationBuilder.AddTestSettings();
+                    configureScriptHostAppConfiguration?.Invoke(scriptHostConfigurationBuilder);
+                })
+                .ConfigureScriptHostLogging(scriptHostLoggingBuilder =>
+                {
+                    scriptHostLoggingBuilder.AddProvider(_scriptHostLoggerProvider);
+                    scriptHostLoggingBuilder.AddFilter<TestLoggerProvider>(_ => true);
+                    configureScriptHostLogging?.Invoke(scriptHostLoggingBuilder);
+                })
+                .ConfigureScriptHostServices(scriptHostServices =>
+                {
+                    configureScriptHostServices?.Invoke(scriptHostServices);
+                })
+                .UseStartup<TestStartup>();
 
             _testServer = new TestServer(builder);
 
-            HttpClient = new HttpClient(new UpdateContentLengthHandler(_testServer.CreateHandler()));
-            HttpClient.BaseAddress = new Uri("https://localhost/");
+            HttpClient = new HttpClient(new UpdateContentLengthHandler(_testServer.CreateHandler()))
+            {
+                BaseAddress = new Uri("https://localhost/")
+            };
 
             var manager = _testServer.Host.Services.GetService<IScriptHostManager>();
             _hostService = manager as WebJobsScriptHostService;
@@ -174,13 +181,6 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
         public IList<LogMessage> GetScriptHostLogMessages() => _scriptHostLoggerProvider.GetAllLogMessages();
         public IEnumerable<LogMessage> GetScriptHostLogMessages(string category) => GetScriptHostLogMessages().Where(p => p.Category == category);
 
-        /// <summary>
-        /// The functions host has two logger providers -- one at the WebHost level and one at the ScriptHost level. 
-        /// These providers use different LoggerProviders, so it's important to know which one is receiving the logs.
-        /// </summary>
-        /// <returns>The messages from the WebHost LoggerProvider</returns>
-        public IList<LogMessage> GetWebHostLogMessages() => _webHostLoggerProvider.GetAllLogMessages();
-
         public string GetLog() => string.Join(Environment.NewLine, GetScriptHostLogMessages());
 
         public void ClearLogMessages() => _scriptHostLoggerProvider.ClearAllLogMessages();
@@ -252,6 +252,44 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
                 }
 
                 return base.SendAsync(request, cancellationToken);
+            }
+        }
+
+        private class TestStartup
+        {
+            private Startup _startup;
+            private readonly PostConfigureServices _postConfigure;
+
+            public TestStartup(IConfiguration configuration, PostConfigureServices postConfigure)
+            {
+                _startup = new Startup(configuration);
+                _postConfigure = postConfigure;
+            }
+
+            public void ConfigureServices(IServiceCollection services)
+            {
+                _startup.ConfigureServices(services);
+                _postConfigure?.ConfigureServices(services);
+            }
+
+            public void Configure(AspNetCore.Builder.IApplicationBuilder app, AspNetCore.Hosting.IApplicationLifetime applicationLifetime, AspNetCore.Hosting.IHostingEnvironment env, ILoggerFactory loggerFactory)
+            {
+                _startup.Configure(app, applicationLifetime, env, loggerFactory);
+            }
+        }
+
+        private class PostConfigureServices
+        {
+            private readonly Action<IServiceCollection> _postConfigure;
+
+            public PostConfigureServices(Action<IServiceCollection> postConfigure)
+            {
+                _postConfigure = postConfigure;
+            }
+
+            public void ConfigureServices(IServiceCollection services)
+            {
+                _postConfigure?.Invoke(services);
             }
         }
     }

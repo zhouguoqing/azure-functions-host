@@ -32,8 +32,6 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Rpc
 
         public string Id => _workerId;
 
-        public WorkerConfig Config => throw new NotImplementedException();
-
         public IDictionary<string, BufferBlock<ScriptInvocationContext>> FunctionInputBuffers => throw new NotImplementedException();
 
         public LanguageWorkerChannelState State => _state;
@@ -52,9 +50,10 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Rpc
             _testLogger.LogInformation("RegisterFunctions called");
         }
 
-        public void SendFunctionEnvironmentReloadRequest()
+        public Task SendFunctionEnvironmentReloadRequest()
         {
             _testLogger.LogInformation("SendFunctionEnvironmentReloadRequest called");
+            return Task.CompletedTask;
         }
 
         public void SendInvocationRequest(ScriptInvocationContext context)
@@ -62,28 +61,16 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Rpc
             _testLogger.LogInformation("SendInvocationRequest called");
         }
 
-        public Task StartWorkerProcessAsync()
+        public async Task StartWorkerProcessAsync()
         {
             // To verify FunctionDispatcher transistions
-            Task.Delay(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
             string workerVersion = Guid.NewGuid().ToString();
             IDictionary<string, string> workerCapabilities = new Dictionary<string, string>()
             {
                 { "test", "testSupported" }
             };
-
-            if (_isWebhostChannel)
-            {
-                RpcWebHostChannelReadyEvent readyEvent = new RpcWebHostChannelReadyEvent(_workerId, _runtime, this, workerVersion, workerCapabilities);
-                _eventManager.Publish(readyEvent);
-            }
-            else
-            {
-                RpcJobHostChannelReadyEvent readyEvent = new RpcJobHostChannelReadyEvent(_workerId, _runtime, this, workerVersion, workerCapabilities);
-                _eventManager.Publish(readyEvent);
-            }
             _state = LanguageWorkerChannelState.Initialized;
-            return Task.CompletedTask;
         }
 
         public void RaiseWorkerError()

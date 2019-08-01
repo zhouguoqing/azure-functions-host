@@ -97,8 +97,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
                     return result;
                 }
 
-                var payload = await GetSyncTriggersPayload();
-                string json = JsonConvert.SerializeObject(payload);
+                string json = await GetSyncTriggersPayload();
 
                 bool shouldSyncTriggers = true;
                 string newHash = null;
@@ -245,7 +244,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             return _hashBlob;
         }
 
-        public async Task<JToken> GetSyncTriggersPayload()
+        public async Task<string> GetSyncTriggersPayload()
         {
             var hostOptions = _applicationHostOptions.CurrentValue.ToHostOptions();
             var functionsMetadata = WebFunctionsManager.GetFunctionsMetadata(hostOptions, _workerConfigs, _logger);
@@ -257,7 +256,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             if (!ArmCacheEnabled)
             {
                 // extended format is disabled - just return triggers
-                return triggersArray;
+                return JsonConvert.SerializeObject(triggersArray);
             }
 
             // Add triggers to the payload
@@ -310,7 +309,17 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
                 // like KeyVault when the feature comes online
             }
 
-            return result;
+            string json = JsonConvert.SerializeObject(result);
+            if (json.Length > ScriptConstants.MaxTriggersStringLength)
+            {
+                // The settriggers call to the FE enforces a max request size
+                // limit. If we're over limit, revert to the minimal triggers
+                // format.
+                _logger.LogWarning($"SyncTriggers payload of length '{json.Length}' exceeds max length of '{ScriptConstants.MaxTriggersStringLength}'. Reverting to minimal format.");
+                return JsonConvert.SerializeObject(triggersArray);
+            }
+
+            return json;
         }
 
         internal async Task<IEnumerable<JObject>> GetFunctionTriggers(IEnumerable<FunctionMetadata> functionsMetadata, ScriptJobHostOptions hostOptions)
@@ -358,20 +367,19 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             var config = new Dictionary<string, string>();
             if (FileUtility.FileExists(hostJsonPath))
             {
-                var hostJson = JObject.Parse(await FileUtility.ReadAsync(hostJsonPath));
-                JToken durableTaskValue;
+                var json = JObject.Parse(await FileUtility.ReadAsync(hostJsonPath));
+
+                // get the DurableTask extension config section
+                JToken extensionsValue;
+                if (json.TryGetValue("extensions", StringComparison.OrdinalIgnoreCase, out extensionsValue) && extensionsValue != null)
+                {
+                    json = (JObject)extensionsValue;
+                }
 
                 // we will allow case insensitivity given it is likely user hand edited
                 // see https://github.com/Azure/azure-functions-durable-extension/issues/111
-                //
-                // We're looking for {VALUE}
-                // {
-                //     "durableTask": {
-                //         "hubName": "{VALUE}",
-                //         "azureStorageConnectionStringName": "{VALUE}"
-                //     }
-                // }
-                if (hostJson.TryGetValue(DurableTask, StringComparison.OrdinalIgnoreCase, out durableTaskValue) && durableTaskValue != null)
+                JToken durableTaskValue;
+                if (json.TryGetValue(DurableTask, StringComparison.OrdinalIgnoreCase, out durableTaskValue) && durableTaskValue != null)
                 {
                     try
                     {
@@ -421,9 +429,12 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             if (ArmCacheEnabled)
             {
                 // sanitize the content before logging
-                var sanitizedContent = JObject.Parse(content);
-                sanitizedContent.Remove("secrets");
-                sanitizedContentString = sanitizedContent.ToString();
+                var sanitizedContent = JToken.Parse(content);
+                if (sanitizedContent.Type == JTokenType.Object)
+                {
+                    ((JObject)sanitizedContent).Remove("secrets");
+                    sanitizedContentString = sanitizedContent.ToString();
+                }
             }
 
             using (var request = BuildSetTriggersRequest())
@@ -431,7 +442,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
                 var requestId = Guid.NewGuid().ToString();
                 request.Headers.Add(ScriptConstants.AntaresLogIdHeaderName, requestId);
                 request.Headers.Add("User-Agent", ScriptConstants.FunctionsUserAgent);
-                request.Headers.Add("x-ms-site-restricted-token", token);
+                request.Headers.Add(ScriptConstants.SiteTokenHeaderName, token);
                 request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
                 _logger.LogDebug($"Making SyncTriggers request (RequestId={requestId}, Uri={request.RequestUri.ToString()}, Content={sanitizedContentString}).");

@@ -7,12 +7,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Script.Config;
 using Microsoft.Azure.WebJobs.Script.Diagnostics;
+using Microsoft.Azure.WebJobs.Script.Middleware;
 using Microsoft.Azure.WebJobs.Script.Rpc;
 using Microsoft.Azure.WebJobs.Script.WebHost.Configuration;
 using Microsoft.Azure.WebJobs.Script.WebHost.ContainerManagement;
 using Microsoft.Azure.WebJobs.Script.WebHost.DependencyInjection;
 using Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics;
 using Microsoft.Azure.WebJobs.Script.WebHost.Management;
+using Microsoft.Azure.WebJobs.Script.WebHost.Metrics;
 using Microsoft.Azure.WebJobs.Script.WebHost.Middleware;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authorization;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authorization.Policies;
@@ -121,12 +123,18 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             services.AddSingleton<WebJobsScriptHostService>();
             services.AddSingleton<IHostedService>(s => s.GetRequiredService<WebJobsScriptHostService>());
 
+            // Handles shutdown of services that need to happen after StopAsync() of all services of type IHostedService are complete.
+            // Order is important.
+            // All other IHostedService injections need to go before this.
+            services.AddSingleton<IHostedService, HostedServiceManager>();
+
             // Configuration
             services.ConfigureOptions<ScriptApplicationHostOptionsSetup>();
             services.ConfigureOptions<StandbyOptionsSetup>();
             services.ConfigureOptions<LanguageWorkerOptionsSetup>();
 
             services.TryAddSingleton<IDependencyValidator, DependencyValidator>();
+            services.TryAddSingleton<IJobHostMiddlewarePipeline>(s => DefaultMiddlewarePipeline.Empty);
         }
 
         private static void AddStandbyServices(this IServiceCollection services)
@@ -160,6 +168,22 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                 }
 
                 return NullHostedService.Instance;
+            });
+
+            services.AddSingleton<IMetricsPublisher>(s =>
+            {
+                var environment = s.GetService<IEnvironment>();
+                if (environment.IsLinuxMetricsPublishingEnabled())
+                {
+                    var logger = s.GetService<ILogger<LinuxContainerMetricsPublisher>>();
+                    var standbyOptions = s.GetService<IOptionsMonitor<StandbyOptions>>();
+                    var httpClient = s.GetService<HttpClient>();
+                    var hostNameProvider = s.GetService<HostNameProvider>();
+                    return new LinuxContainerMetricsPublisher(environment, standbyOptions, logger, httpClient, hostNameProvider);
+                }
+
+                var nullMetricsLogger = s.GetService<ILogger<NullMetricsPublisher>>();
+                return new NullMetricsPublisher(nullMetricsLogger);
             });
         }
     }

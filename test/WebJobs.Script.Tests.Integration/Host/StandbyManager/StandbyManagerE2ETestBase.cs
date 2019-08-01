@@ -35,7 +35,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
         protected readonly object _originalTimeZoneInfoCache = GetCachedTimeZoneInfo();
         protected TestMetricsLogger _metricsLogger;
 
-    public StandbyManagerE2ETestBase()
+        public StandbyManagerE2ETestBase()
         {
             _testRootPath = Path.Combine(Path.GetTempPath(), "StandbyManagerTests");
             CleanupTestDirectory();
@@ -77,10 +77,6 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
                     }
                     c.AddTestSettings();
                 })
-                .ConfigureLogging(c =>
-                {
-                    c.AddProvider(_loggerProvider);
-                })
                 .ConfigureServices(c =>
                 {
                     c.ConfigureAll<ScriptApplicationHostOptions>(o =>
@@ -92,8 +88,11 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
                     });
 
                     c.AddSingleton<IEnvironment>(_ => environment);
-                    c.AddSingleton<IConfigureBuilder<ILoggingBuilder>>(new DelegatedConfigureBuilder<ILoggingBuilder>(b => b.AddProvider(_loggerProvider)));
                     c.AddSingleton<IMetricsLogger>(_ => _metricsLogger);
+                })
+                .ConfigureScriptHostLogging(b =>
+                {
+                    b.AddProvider(_loggerProvider);
                 });
 
             _httpServer = new TestServer(webHostBuilder);
@@ -121,7 +120,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
             // issue warmup request and verify
             var request = new HttpRequestMessage(HttpMethod.Get, uri);
             var response = await _httpClient.SendAsync(request);
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.True(response.StatusCode == HttpStatusCode.OK, $"Expected 'OK'. Actual '{response.StatusCode}'. {_loggerProvider.GetLog()}");
             string responseBody = await response.Content.ReadAsStringAsync();
             Assert.Equal("WarmUp complete.", responseBody);
         }

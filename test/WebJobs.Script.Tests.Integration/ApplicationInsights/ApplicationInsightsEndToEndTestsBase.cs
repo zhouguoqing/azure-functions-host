@@ -13,6 +13,8 @@ using Microsoft.ApplicationInsights.DataContracts;
 using Microsoft.ApplicationInsights.Extensibility.Implementation;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.Logging;
+using Microsoft.Azure.WebJobs.Script.Diagnostics;
+using Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -78,16 +80,15 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.ApplicationInsights
                 }
             }
 
-            // TODO: Re-enable this when we can override IMetricsLogger
             // App Insights logs first, so wait until this metric appears
-            // string metricKey = MetricsEventManager.GetAggregateKey(MetricEventNames.FunctionUserLog, functionName);
-            // IEnumerable<string> GetMetrics() => _fixture.MetricsLogger.LoggedEvents.Where(p => p == metricKey);
+            string metricKey = MetricsEventManager.GetAggregateKey(MetricEventNames.FunctionUserLog, functionName);
+            IEnumerable<string> GetMetrics() => _fixture.MetricsLogger.LoggedEvents.Where(p => p == metricKey);
 
             // TODO: Remove this check when metrics are supported in Node:
             // https://github.com/Azure/azure-functions-host/issues/2189
-            // int expectedCount = this is ApplicationInsightsCSharpEndToEndTests ? 10 : 5;
-            // await TestHelpers.Await(() => GetMetrics().Count() == expectedCount,
-            //    timeout: 15000, userMessageCallback: () => string.Join(Environment.NewLine, GetMetrics().Select(p => p.ToString())));
+            int expectedCount = this is ApplicationInsightsCSharpEndToEndTests ? 10 : 5;
+            await TestHelpers.Await(() => GetMetrics().Count() == expectedCount,
+                timeout: 15000, userMessageCallback: () => string.Join(Environment.NewLine, GetMetrics().Select(p => p.ToString())));
         }
 
         [Fact]
@@ -273,14 +274,16 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.ApplicationInsights
                 !t.Message.StartsWith("Host Status")
             ).ToArray();
 
-            int expectedCount = 12;
+            int expectedCount = 15;
             Assert.True(traces.Length == expectedCount, $"Expected {expectedCount} messages, but found {traces.Length}. Actual logs:{Environment.NewLine}{string.Join(Environment.NewLine, traces.Select(t => t.Message))}");
 
             int idx = 0;
             ValidateTrace(traces[idx++], "2 functions loaded", LogCategories.Startup);
             ValidateTrace(traces[idx++], "A function whitelist has been specified", LogCategories.Startup);
+            ValidateTrace(traces[idx++], "Building host: startup suppressed:False, configuration suppressed: False", ScriptConstants.LogCategoryHostGeneral);
             ValidateTrace(traces[idx++], "Found the following functions:\r\n", LogCategories.Startup);
             ValidateTrace(traces[idx++], "Generating 2 job function(s)", LogCategories.Startup);
+            ValidateTrace(traces[idx++], "Host configuration file read:", LogCategories.Startup);
             ValidateTrace(traces[idx++], "Host initialization: ConsecutiveErrors=0, StartupCount=1", LogCategories.Startup);
             ValidateTrace(traces[idx++], "Host initialized (", LogCategories.Startup);
             ValidateTrace(traces[idx++], "Host lock lease acquired by instance ID", ScriptConstants.LogCategoryHostGeneral);
@@ -288,6 +291,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.ApplicationInsights
             ValidateTrace(traces[idx++], "Initializing Host", LogCategories.Startup);
             ValidateTrace(traces[idx++], "Job host started", LogCategories.Startup);
             ValidateTrace(traces[idx++], "Loading functions metadata", LogCategories.Startup);
+            ValidateTrace(traces[idx++], "Reading host configuration file ", LogCategories.Startup);
             ValidateTrace(traces[idx++], "Starting Host (HostId=", LogCategories.Startup);
         }
 

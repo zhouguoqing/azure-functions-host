@@ -40,6 +40,7 @@ namespace Microsoft.Azure.WebJobs.Script
         public const string TraceSourceHttpThrottleMiddleware = "HttpThrottleMiddleware";
 
         public const string LoggerHttpRequest = "MS_HttpRequest";
+        public const string LoggerDeferredLog = "MS_DeferredLog";
 
         public const string LogCategoryHostController = "Host.Controllers.Host";
         public const string LogCategoryFunctionsController = "Host.Controllers.Functions";
@@ -82,6 +83,7 @@ namespace Microsoft.Azure.WebJobs.Script
         public const string AntaresLogIdHeaderName = "X-ARR-LOG-ID";
         public const string AntaresScaleOutHeaderName = "X-FUNCTION-SCALEOUT";
         public const string AntaresColdStartHeaderName = "X-MS-COLDSTART";
+        public const string SiteTokenHeaderName = "x-ms-site-restricted-token";
         public const string DynamicSku = "Dynamic";
         public const string DefaultProductionSlotName = "production";
 
@@ -90,6 +92,7 @@ namespace Microsoft.Azure.WebJobs.Script
 
         public const string FeatureFlagDisableShadowCopy = "DisableShadowCopy";
         public const string FeatureFlagsEnableDynamicExtensionLoading = "EnableDynamicExtensionLoading";
+        public const string FeatureFlagEnableActionResultHandling = "EnableActionResultHandling";
 
         public const string AdminJwtValidAudienceFormat = "https://{0}.azurewebsites.net/azurefunctions";
         public const string AdminJwtValidIssuerFormat = "https://{0}.scm.azurewebsites.net";
@@ -104,6 +107,12 @@ namespace Microsoft.Azure.WebJobs.Script
 
         public const int MaximumHostIdLength = 32;
         public const int DynamicSkuConnectionLimit = 50;
+
+        /// <summary>
+        /// This constant is also defined in Antares, where the limit is ultimately enforced
+        /// for settriggers calls. If we raise that limit there, we should raise here as well.
+        /// </summary>
+        public const int MaxTriggersStringLength = 102400;
 
         public const string ExtensionsProjectFileName = "extensions.csproj";
         public const string MetadataGeneratorPackageId = "Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator";
@@ -135,5 +144,6 @@ namespace Microsoft.Azure.WebJobs.Script
 
         public static readonly ImmutableArray<string> HttpMethods = ImmutableArray.Create("get", "post", "delete", "head", "patch", "put", "options");
         public static readonly ImmutableArray<string> AssemblyFileTypes = ImmutableArray.Create(".dll", ".exe");
+        public static readonly string HostUserAgent = $"azure-functions-host/{ScriptHost.Version}";
     }
 }

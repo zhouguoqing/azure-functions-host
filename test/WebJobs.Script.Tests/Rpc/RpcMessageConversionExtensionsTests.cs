@@ -3,8 +3,12 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.Claims;
+using System.Text;
+using Google.Protobuf;
 using Google.Protobuf.Collections;
 using Google.Protobuf.WellKnownTypes;
 using Microsoft.AspNetCore.Http;
@@ -12,23 +16,27 @@ using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.Grpc.Messages;
 using Microsoft.Azure.WebJobs.Script.Rpc;
 using Microsoft.WebJobs.Script.Tests;
+using Newtonsoft.Json;
 using Xunit;
 
 namespace Microsoft.Azure.WebJobs.Script.Tests.Rpc
 {
     public class RpcMessageConversionExtensionsTests
     {
+        private static readonly string TestImageLocation = "Rpc\\Resources\\functions.png";
+
         [Theory]
         [InlineData("application/x-www-form-urlencoded’", "say=Hi&to=Mom")]
         public void HttpObjects_StringBody(string expectedContentType, object body)
         {
             var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
 
             var headers = new HeaderDictionary();
             headers.Add("content-type", expectedContentType);
             HttpRequest request = HttpTestHelpers.CreateHttpRequest("GET", "http://localhost/api/httptrigger-scenarios", headers, body);
 
-            var rpcRequestObject = request.ToRpc(logger);
+            var rpcRequestObject = request.ToRpc(logger, capabilities);
             Assert.Equal(body.ToString(), rpcRequestObject.Http.Body.String);
 
             string contentType;
@@ -43,10 +51,11 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Rpc
         public void HttpObjects_Query(string queryString, string[] expectedKeys, string[] expectedValues)
         {
             var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
 
             HttpRequest request = HttpTestHelpers.CreateHttpRequest("GET", $"http://localhost/api/httptrigger-scenarios?{queryString}");
 
-            var rpcRequestObject = request.ToRpc(logger);
+            var rpcRequestObject = request.ToRpc(logger, capabilities);
             // Same number of expected key value pairs
             Assert.Equal(rpcRequestObject.Http.Query.Count, expectedKeys.Length);
             Assert.Equal(rpcRequestObject.Http.Query.Count, expectedValues.Length);
@@ -188,6 +197,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Rpc
         public void HttpObjects_ClaimsPrincipal()
         {
             var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
 
             HttpRequest request = HttpTestHelpers.CreateHttpRequest("GET", $"http://localhost/apihttptrigger-scenarios");
 
@@ -201,7 +211,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Rpc
 
             request.HttpContext.User = new ClaimsPrincipal(claimsIdentities);
 
-            var rpcRequestObject = request.ToRpc(logger);
+            var rpcRequestObject = request.ToRpc(logger, capabilities);
 
             var identities = request.HttpContext.User.Identities.ToList();
             var rpcIdentities = rpcRequestObject.Http.Identities.ToList();
@@ -246,6 +256,269 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Rpc
                 "http://schemas.microsoft.com/ws/2008/06/identity/claims/role");
 
             return identity;
+        }
+
+        [Theory]
+        [InlineData("application/octet-stream", "true")]
+        [InlineData("image/png", "true")]
+        [InlineData("application/octet-stream", null)]
+        [InlineData("image/png", null)]
+        public void HttpObjects_RawBodyBytes_Image_Length(string contentType, string rawBytesEnabled)
+        {
+            var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
+            if (!string.Equals(rawBytesEnabled, null))
+            {
+                capabilities.UpdateCapabilities(new MapField<string, string>
+                {
+                    { LanguageWorkerConstants.RawHttpBodyBytes, rawBytesEnabled.ToString() }
+                });
+            }
+
+            FileStream image = new FileStream(TestImageLocation, FileMode.Open, FileAccess.Read);
+            byte[] imageBytes = FileStreamToBytes(image);
+            string imageString = Encoding.UTF8.GetString(imageBytes);
+
+            long imageBytesLength = imageBytes.Length;
+            long imageStringLength = imageString.Length;
+
+            var headers = new HeaderDictionary();
+            headers.Add("content-type", contentType);
+            HttpRequest request = HttpTestHelpers.CreateHttpRequest("GET", "http://localhost/api/httptrigger-scenarios", headers, imageBytes);
+
+            var rpcRequestObject = request.ToRpc(logger, capabilities);
+            if (string.IsNullOrEmpty(rawBytesEnabled))
+            {
+                Assert.Empty(rpcRequestObject.Http.RawBody.Bytes);
+                Assert.Equal(imageStringLength, rpcRequestObject.Http.RawBody.String.Length);
+            }
+            else
+            {
+                Assert.Empty(rpcRequestObject.Http.RawBody.String);
+                Assert.Equal(imageBytesLength, rpcRequestObject.Http.RawBody.Bytes.ToByteArray().Length);
+            }
+        }
+
+        private byte[] FileStreamToBytes(FileStream file)
+        {
+            using (var memoryStream = new MemoryStream())
+            {
+                file.CopyTo(memoryStream);
+                return memoryStream.ToArray();
+            }
+        }
+
+        [Fact]
+        public void ToRpc_Collection_String_With_Capabilities_Value()
+        {
+            var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
+            MapField<string, string> addedCapabilities = new MapField<string, string>
+            {
+                { LanguageWorkerConstants.TypedDataCollection, LanguageWorkerConstants.TypedDataCollection }
+            };
+
+            capabilities.UpdateCapabilities(addedCapabilities);
+            string[] arrString = { "element1", "element_2" };
+            TypedData returned_typedata = arrString.ToRpc(logger, capabilities);
+
+            TypedData typedData = new TypedData();
+            CollectionString collectionString = new CollectionString();
+            foreach (string element in arrString)
+            {
+                if (!string.IsNullOrEmpty(element))
+                {
+                    collectionString.String.Add(element);
+                }
+            }
+            typedData.CollectionString = collectionString;
+
+            Assert.Equal(typedData.CollectionString, returned_typedata.CollectionString);
+            Assert.Equal(typedData.CollectionString.String[0], returned_typedata.CollectionString.String[0]);
+        }
+
+        [Fact]
+        public void ToRpc_Collection_String_Without_Capabilities_Value()
+        {
+            var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
+
+            string[] arrString = { "element1", "element_2" };
+            TypedData returned_typedata = arrString.ToRpc(logger, capabilities);
+
+            TypedData typedData = new TypedData();
+            typedData.Json = JsonConvert.SerializeObject(arrString);
+
+            Assert.Equal(typedData.Json, returned_typedata.Json);
+        }
+
+        [Fact]
+        public void ToRpc_Collection_Long_With_Capabilities_Value()
+        {
+            var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
+            MapField<string, string> addedCapabilities = new MapField<string, string>
+            {
+                { LanguageWorkerConstants.TypedDataCollection, LanguageWorkerConstants.TypedDataCollection }
+            };
+
+            capabilities.UpdateCapabilities(addedCapabilities);
+            long[] arrLong = { 1L, 2L };
+            TypedData returned_typedata = arrLong.ToRpc(logger, capabilities);
+
+            TypedData typedData = new TypedData();
+            CollectionSInt64 collectionLong = new CollectionSInt64();
+            foreach (long element in arrLong)
+            {
+                collectionLong.Sint64.Add(element);
+            }
+            typedData.CollectionSint64 = collectionLong;
+
+            Assert.Equal(typedData.CollectionSint64, returned_typedata.CollectionSint64);
+            Assert.Equal(typedData.CollectionSint64.Sint64[0], returned_typedata.CollectionSint64.Sint64[0]);
+        }
+
+        [Fact]
+        public void ToRpc_Collection_Long_Without_Capabilities_Value()
+        {
+            var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
+
+            long[] arrLong = { 1L, 2L };
+            TypedData returned_typedata = arrLong.ToRpc(logger, capabilities);
+
+            TypedData typedData = new TypedData();
+            typedData.Json = JsonConvert.SerializeObject(arrLong);
+
+            Assert.Equal(typedData.Json, returned_typedata.Json);
+        }
+
+        [Fact]
+        public void ToRpc_Collection_Double_With_Capabilities_Value()
+        {
+            var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
+            MapField<string, string> addedCapabilities = new MapField<string, string>
+            {
+                { LanguageWorkerConstants.TypedDataCollection, LanguageWorkerConstants.TypedDataCollection }
+            };
+
+            capabilities.UpdateCapabilities(addedCapabilities);
+            double[] arrDouble = { 1.1, 2.2 };
+            TypedData returned_typedata = arrDouble.ToRpc(logger, capabilities);
+            TypedData typedData = new TypedData();
+
+            CollectionDouble collectionDouble = new CollectionDouble();
+            foreach (double element in arrDouble)
+            {
+                collectionDouble.Double.Add(element);
+            }
+            typedData.CollectionDouble = collectionDouble;
+
+            Assert.Equal(typedData.CollectionDouble, returned_typedata.CollectionDouble);
+            Assert.Equal(typedData.CollectionDouble.Double[0], returned_typedata.CollectionDouble.Double[0]);
+        }
+
+        [Fact]
+        public void ToRpc_Collection_Double_Without_Capabilities_Value()
+        {
+            var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
+
+            double[] arrDouble = { 1.1, 2.2 };
+            TypedData returned_typedata = arrDouble.ToRpc(logger, capabilities);
+
+            TypedData typedData = new TypedData();
+            typedData.Json = JsonConvert.SerializeObject(arrDouble);
+
+            Assert.Equal(typedData.Json, returned_typedata.Json);
+        }
+
+        [Fact]
+        public void ToRpc_Collection_Byte_With_Capabilities_Value()
+        {
+            var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
+            MapField<string, string> addedCapabilities = new MapField<string, string>
+            {
+                { LanguageWorkerConstants.TypedDataCollection, LanguageWorkerConstants.TypedDataCollection }
+            };
+
+            capabilities.UpdateCapabilities(addedCapabilities);
+
+            byte[][] arrBytes = new byte[2][];
+            arrBytes[0] = new byte[] { 22 };
+            arrBytes[1] = new byte[] { 11 };
+
+            TypedData returned_typedata = arrBytes.ToRpc(logger, capabilities);
+            TypedData typedData = new TypedData();
+
+            CollectionBytes collectionBytes = new CollectionBytes();
+            foreach (byte[] element in arrBytes)
+            {
+                if (element != null)
+                {
+                    collectionBytes.Bytes.Add(ByteString.CopyFrom(element));
+                }
+            }
+            typedData.CollectionBytes = collectionBytes;
+
+            Assert.Equal(typedData.CollectionBytes, returned_typedata.CollectionBytes);
+            Assert.Equal(typedData.CollectionBytes.Bytes[0], returned_typedata.CollectionBytes.Bytes[0]);
+        }
+
+        [Fact]
+        public void ToRpc_Collection_Byte_Without_Capabilities_Value()
+        {
+            var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
+
+            byte[][] arrByte = new byte[2][];
+            arrByte[0] = new byte[] { 22 };
+            arrByte[1] = new byte[] { 11 };
+
+            TypedData returned_typedata = arrByte.ToRpc(logger, capabilities);
+
+            TypedData typedData = new TypedData();
+            typedData.Json = JsonConvert.SerializeObject(arrByte);
+
+            Assert.Equal(typedData.Json, returned_typedata.Json);
+        }
+
+        [Fact]
+        public void ToRpc_Bytes_Without_Capabilities_Value()
+        {
+            var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
+
+            byte[] arrByte = Encoding.Default.GetBytes("HellowWorld");
+
+            TypedData returned_typedata = arrByte.ToRpc(logger, capabilities);
+
+            TypedData typedData = new TypedData();
+            typedData.Bytes = ByteString.CopyFrom(arrByte);
+
+            Assert.Equal(typedData.Bytes, returned_typedata.Bytes);
+        }
+
+        [Fact]
+        public void ToRpc_Bytes_With_Capabilities_Value()
+        {
+            var logger = MockNullLoggerFactory.CreateLogger();
+            var capabilities = new Capabilities(logger);
+            MapField<string, string> addedCapabilities = new MapField<string, string>
+            {
+                { LanguageWorkerConstants.TypedDataCollection, LanguageWorkerConstants.TypedDataCollection }
+            };
+            capabilities.UpdateCapabilities(addedCapabilities);
+            byte[] arrByte = Encoding.Default.GetBytes("HellowWorld");
+
+            TypedData returned_typedata = arrByte.ToRpc(logger, capabilities);
+
+            TypedData typedData = new TypedData();
+            typedData.Bytes = ByteString.CopyFrom(arrByte);
+
+            Assert.Equal(typedData.Bytes, returned_typedata.Bytes);
         }
     }
 }

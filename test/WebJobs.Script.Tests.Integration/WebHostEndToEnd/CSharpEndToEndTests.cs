@@ -109,11 +109,10 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.EndToEnd
 
             logs.Single(p => p.EndsWith($"From TraceWriter: {guid1}"));
             logs.Single(p => p.EndsWith($"From ILogger: {guid2}"));
-
-            // TODO: Re-enable once we can override the IMetricsLogger
+                        
             // Make sure we get a metric logged from both ILogger and TraceWriter
             var key = MetricsEventManager.GetAggregateKey(MetricEventNames.FunctionUserLog, "Scenarios");            
-            // Assert.Equal(2, Fixture.MetricsLogger.LoggedEvents.Where(p => p == key).Count());
+            Assert.Equal(2, Fixture.MetricsLogger.LoggedEvents.Where(p => p == key).Count());
 
             // Make sure we've gotten a log from the aggregator
             IEnumerable<LogMessage> getAggregatorLogs() => Fixture.Host.GetScriptHostLogMessages().Where(p => p.Category == LogCategories.Aggregator);
@@ -122,6 +121,13 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.EndToEnd
 
             var aggregatorLogs = getAggregatorLogs();
             Assert.Equal(1, aggregatorLogs.Count());
+
+            // Make sure that no user logs made it to the EventGenerator (which the SystemLogger writes to)
+            IEnumerable<FunctionTraceEvent> allLogs = Fixture.EventGenerator.GetFunctionTraceEvents();
+            Assert.False(allLogs.Any(l => l.Summary.Contains("From ")));
+            Assert.False(allLogs.Any(l => l.Source.EndsWith(".User")));
+            Assert.False(allLogs.Any(l => l.Source == LanguageWorkerConstants.FunctionConsoleLogCategoryName));
+            Assert.NotEmpty(allLogs);
         }
 
         [Fact]
@@ -320,7 +326,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.EndToEnd
         {
             FunctionStatus status = await Fixture.Host.GetFunctionStatusAsync("FunctionIndexingError");
             string error = status.Errors.Single();
-            Assert.Equal("Microsoft.Azure.WebJobs.Host: Error indexing method 'Functions.FunctionIndexingError'. Microsoft.Azure.WebJobs.Extensions.Storage: Storage account 'setting_does_not_exist' is not configured.", error);
+            Assert.Equal("Microsoft.Azure.WebJobs.Host: Error indexing method 'Functions.FunctionIndexingError'. Microsoft.Azure.WebJobs.Extensions.Storage: Storage account connection string 'setting_does_not_exist' does not exist. Make sure that it is a defined App Setting.", error);
         }
 
         //[Theory(Skip = "Not yet enabled.")]
@@ -426,9 +432,9 @@ namespace SecondaryDependency
                 primaryCompilation.Emit(Path.Combine(sharedAssembliesPath, "PrimaryDependency.dll"));
             }
 
-            public override void ConfigureJobHost(IWebJobsBuilder webJobsBuilder)
+            public override void ConfigureScriptHost(IWebJobsBuilder webJobsBuilder)
             {
-                base.ConfigureJobHost(webJobsBuilder);
+                base.ConfigureScriptHost(webJobsBuilder);
 
                 webJobsBuilder.AddAzureStorage();
                 webJobsBuilder.Services.Configure<ScriptJobHostOptions>(o =>
