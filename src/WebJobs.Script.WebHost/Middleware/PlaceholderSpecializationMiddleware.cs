@@ -51,6 +51,8 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
             if (!_webHostEnvironment.InStandbyMode && _environment.IsContainerReady())
             {
                 ILanguageWorkerChannel channel = _webHostlanguageWorkerChannelManager.GetChannels("node").FirstOrDefault();
+                await channel.SendFunctionEnvironmentReloadRequest();
+
                 BindingMetadata bindingMetadataIn = new BindingMetadata()
                 {
                     Type = "httpTrigger",
