@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.Rpc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using FunctionMetadata = Microsoft.Azure.WebJobs.Script.Description.FunctionMetadata;
@@ -30,11 +31,12 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
         private readonly IEnumerable<WorkerConfig> _workerConfigs;
         private RequestDelegate _invoke;
         private double _specialized = 0;
+        private ILoggerFactory _loggerFactory;
 
         private IWebHostLanguageWorkerChannelManager _webHostlanguageWorkerChannelManager;
 
         public PlaceholderSpecializationMiddleware(RequestDelegate next, IScriptWebHostEnvironment webHostEnvironment, IOptions<LanguageWorkerOptions> workerConfigOptions,
-            IStandbyManager standbyManager, IEnvironment environment, IWebHostLanguageWorkerChannelManager webHostLanguageWorkerChannelManager, IOptionsMonitor<ScriptApplicationHostOptions> options)
+            IStandbyManager standbyManager, IEnvironment environment, IWebHostLanguageWorkerChannelManager webHostLanguageWorkerChannelManager, IOptionsMonitor<ScriptApplicationHostOptions> options, ILoggerFactory loggerFactory)
         {
             _next = next;
             _invoke = InvokeSpecializationCheck;
@@ -44,6 +46,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
             _webHostlanguageWorkerChannelManager = webHostLanguageWorkerChannelManager;
             _options = options;
             _workerConfigs = workerConfigOptions.Value.WorkerConfigs;
+            _loggerFactory = loggerFactory;
         }
 
         public async Task Invoke(HttpContext httpContext)
@@ -77,53 +80,21 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
                 string scriptPath = _options.CurrentValue.ScriptPath;
                 ILanguageWorkerChannel channel = _webHostlanguageWorkerChannelManager.GetChannels("node").FirstOrDefault();
                 await channel.SendFunctionEnvironmentReloadRequest();
-                //BindingMetadata bindingMetadataIn = new BindingMetadata()
-                //{
-                //    Type = "httpTrigger",
-                //    Direction = BindingDirection.In,
-                //    Name = "req"
-                //};
-
-                //BindingMetadata bindingMetadataOut = new BindingMetadata()
-                //{
-                //    Type = "http",
-                //    Direction = BindingDirection.Out,
-                //    Name = "res"
-                //};
-
-                //Collection<BindingMetadata> bindings = new Collection<BindingMetadata>()
-                //{
-                //    bindingMetadataIn,
-                //    bindingMetadataOut
-                //};
-
-                //FunctionMetadata functionMetadata = new FunctionMetadata()
-                //{
-                //    FunctionDirectory = $"{scriptPath}\\HttpTrigger",
-                //    Language = "node",
-                //    Name = "HttpTrigger",
-                //    ScriptFile = $"{scriptPath}\\HttpTrigger\\index.js",
-                //    IsProxy = false,
-                //    IsDisabled = false,
-                //    IsDirect = false,
-                //    Bindings = bindings
-                //};
-
-                //List<FunctionMetadata> functions = new List<FunctionMetadata>()
-                //{
-                //    functionMetadata
-                //};
 
                 IEnumerable<FunctionMetadata> functions = ReadFunctionsMetadata(scriptPath, null, _workerConfigs);
                 channel.SetupFunctionInvocationBuffers(functions);
                 TaskCompletionSource<bool> loadTask = new TaskCompletionSource<bool>();
                 channel.SendFunctionLoadRequest(functions.ElementAt(0), loadTask);
                 await loadTask.Task;
-
                 ScriptInvocationContext scriptInvocationContext = new ScriptInvocationContext()
                 {
                     FunctionMetadata = functions.ElementAt(0),
-                    ResultSource = new TaskCompletionSource<ScriptInvocationResult>()
+                    ResultSource = new TaskCompletionSource<ScriptInvocationResult>(),
+                    AsyncExecutionContext = System.Threading.ExecutionContext.Capture(),
+
+                    // TODO: link up cancellation token to parameter descriptors
+                    CancellationToken = CancellationToken.None,
+                    Logger = _loggerFactory.CreateLogger("HttpTrigger")
                 };
 
                 channel.SendInvocationRequest(scriptInvocationContext);

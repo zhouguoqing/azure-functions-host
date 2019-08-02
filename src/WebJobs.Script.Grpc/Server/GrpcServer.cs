@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Grpc.Core;
+using Grpc.Core.Logging;
 using Microsoft.Azure.WebJobs.Script.Abstractions;
 using Microsoft.Azure.WebJobs.Script.Grpc.Messages;
 
@@ -18,6 +19,7 @@ namespace Microsoft.Azure.WebJobs.Script.Grpc
 
         public GrpcServer(FunctionRpc.FunctionRpcBase serviceImpl)
         {
+            // GrpcEnvironment.SetLogger(new ConsoleLogger());
             ChannelOption maxReceiveMessageLength = new ChannelOption(ChannelOptions.MaxReceiveMessageLength, MaxMessageLengthBytes);
             ChannelOption maxSendMessageLength = new ChannelOption(ChannelOptions.MaxSendMessageLength, MaxMessageLengthBytes);
             ChannelOption[] grpcChannelOptions = { maxReceiveMessageLength, maxSendMessageLength };

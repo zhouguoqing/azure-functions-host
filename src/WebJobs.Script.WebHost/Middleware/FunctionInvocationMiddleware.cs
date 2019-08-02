@@ -49,7 +49,17 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
 
             if (_next != null)
             {
-                await _next(context);
+                try
+                {
+                    if (context.Session != null)
+                    {
+                        await _next(context);
+                    }
+                }
+                catch (Exception)
+                {
+                    // Hamid without this there is null ref
+                }
             }
 
             _applicationLifetime = context.RequestServices.GetService<IApplicationLifetime>();
