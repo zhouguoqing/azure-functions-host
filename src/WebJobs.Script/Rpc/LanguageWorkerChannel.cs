@@ -33,7 +33,7 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
 {
     internal class LanguageWorkerChannel : ILanguageWorkerChannel, IDisposable
     {
-        private readonly TimeSpan workerInitTimeout = TimeSpan.FromSeconds(30);
+        private readonly TimeSpan workerInitTimeout = TimeSpan.FromSeconds(1200);
         private readonly string _rootScriptPath;
         private readonly IScriptEventManager _eventManager;
         private readonly WorkerConfig _workerConfig;
