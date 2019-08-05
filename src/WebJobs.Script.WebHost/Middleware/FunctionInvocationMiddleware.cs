@@ -51,7 +51,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
             {
                 try
                 {
-                    if (context.Session != null)
+                    //if (context.Session != null)
                     {
                         await _next(context);
                     }

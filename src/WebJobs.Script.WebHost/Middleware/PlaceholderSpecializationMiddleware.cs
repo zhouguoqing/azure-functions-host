@@ -76,6 +76,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
         {
             if (!_webHostEnvironment.InStandbyMode && _environment.IsContainerReady())
             {
+                // TODO: this should only be called for ultra mode
                 _standbyManager.SpecializeHostReloadConfig();
                 string scriptPath = _options.CurrentValue.ScriptPath;
                 ILanguageWorkerChannel channel = _webHostlanguageWorkerChannelManager.GetChannels("node").FirstOrDefault();
@@ -101,6 +102,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
 
                 var t = await scriptInvocationContext.ResultSource.Task;
 
+                // TODO: not always return OKOBjectResult
                 var result = new OkObjectResult(t.Return);
                 ActionContext actionContext = new ActionContext(httpContext, new RouteData(), new ActionDescriptor());
                 await result.ExecuteResultAsync(actionContext);
