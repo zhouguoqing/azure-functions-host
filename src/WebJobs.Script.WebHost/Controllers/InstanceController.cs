@@ -21,11 +21,13 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
     {
         private readonly IEnvironment _environment;
         private readonly IInstanceManager _instanceManager;
+        private readonly ILogger _logger;
 
         public InstanceController(IEnvironment environment, IInstanceManager instanceManager, ILoggerFactory loggerFactory)
         {
             _environment = environment;
             _instanceManager = instanceManager;
+            _logger = loggerFactory.CreateLogger<InstanceController>();
         }
 
         [HttpPost]
@@ -33,6 +35,11 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
         [Authorize(Policy = PolicyNames.AdminAuthLevel)]
         public async Task<IActionResult> Assign([FromBody] EncryptedHostAssignmentContext encryptedAssignmentContext)
         {
+            if (string.IsNullOrEmpty(encryptedAssignmentContext.EncryptedContext))
+            {
+                _logger.LogError("Encrypted Assignment context is null or empty ");
+            }
+
             var containerKey = _environment.GetEnvironmentVariable(EnvironmentSettingNames.ContainerEncryptionKey);
             var assignmentContext = encryptedAssignmentContext.IsWarmup
                 ? null
