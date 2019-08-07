@@ -37,6 +37,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
         public async Task<IActionResult> Assign([FromBody] EncryptedHostAssignmentContext encryptedAssignmentContext)
         {
             _logger.LogDebug("Request url is: " + Request.Host + Request.Path);
+            _logger.LogDebug("IsWarmup " + encryptedAssignmentContext.IsWarmup);
             foreach (var header in Request.Headers)
             {
                 _logger.LogDebug("Header is " + header.Key + " " + header.Value);
