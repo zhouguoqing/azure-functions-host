@@ -35,9 +35,10 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
         [Authorize(Policy = PolicyNames.AdminAuthLevel)]
         public async Task<IActionResult> Assign([FromBody] EncryptedHostAssignmentContext encryptedAssignmentContext)
         {
-            if (string.IsNullOrEmpty(encryptedAssignmentContext.EncryptedContext))
+            if (encryptedAssignmentContext.EncryptedContext == null)
             {
-                _logger.LogError("Encrypted Assignment context is null or empty ");
+                _logger.LogError("Encrypted Assignment context is null.");
+                return StatusCode(StatusCodes.Status400BadRequest);
             }
 
             var containerKey = _environment.GetEnvironmentVariable(EnvironmentSettingNames.ContainerEncryptionKey);
