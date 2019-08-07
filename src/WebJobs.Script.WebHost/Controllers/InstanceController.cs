@@ -9,6 +9,7 @@ using Microsoft.Azure.WebJobs.Script.WebHost.Management;
 using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authorization.Policies;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 
 namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
 {
@@ -35,10 +36,25 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
         [Authorize(Policy = PolicyNames.AdminAuthLevel)]
         public async Task<IActionResult> Assign([FromBody] EncryptedHostAssignmentContext encryptedAssignmentContext)
         {
+            _logger.LogDebug("Request url is: " + Request.Host + Request.Path);
+            foreach (var header in Request.Headers)
+            {
+                _logger.LogDebug("Header is " + header.Key + " " + header.Value);
+            }
+
+           // _logger.LogDebug("request string is: " + Request.)
             if (encryptedAssignmentContext.EncryptedContext == null)
             {
-                _logger.LogError("Encrypted Assignment context is null.");
+                StringValues siteName;
+                Request.Headers.TryGetValue("sf-handlertrace-siteName", out siteName);
+                _logger.LogError("Encrypted Assignment context is null for " + siteName.ToString());
                 return StatusCode(StatusCodes.Status400BadRequest);
+            }
+            else
+            {
+                StringValues siteName;
+                Request.Headers.TryGetValue("sf-handlertrace-siteName", out siteName);
+                _logger.LogInformation("Encrypted Assignment context is not null" + encryptedAssignmentContext.EncryptedContext + "  for " + siteName.ToString());
             }
 
             var containerKey = _environment.GetEnvironmentVariable(EnvironmentSettingNames.ContainerEncryptionKey);
