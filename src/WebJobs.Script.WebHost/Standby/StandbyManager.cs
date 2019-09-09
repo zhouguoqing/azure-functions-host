@@ -173,8 +173,8 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             content = FileUtility.ReadResourceString($"{ScriptConstants.ResourcePath}.Functions.{WarmUpConstants.FunctionName}.function.json");
             File.WriteAllText(Path.Combine(functionPath, "function.json"), content);
             content = FileUtility.ReadResourceString($"{ScriptConstants.ResourcePath}.Functions.{WarmUpConstants.FunctionName}.run.csx");
-            File.WriteAllText(Path.Combine(functionPath, "run.csx"), content);
-
+            content = "module.exports = async function (context, req) {  context.res = { body: 'hello' }; };";
+            File.WriteAllText(Path.Combine(functionPath, "index.js"), content);
             _logger.LogInformation($"StandbyMode placeholder function directory created");
         }
 
