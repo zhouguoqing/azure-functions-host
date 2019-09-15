@@ -293,7 +293,7 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             // associate the invocation input buffer with the function
             var disposableLink = _functionInputBuffers[loadResponse.FunctionId].LinkTo(invokeBlock);
             _inputLinks.Add(disposableLink);
-            _loadTask.SetResult(true);
+            _loadTask?.SetResult(true);
         }
 
         public void SendInvocationRequest(ScriptInvocationContext context)

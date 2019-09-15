@@ -81,6 +81,11 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
                     while (await messageAvailable());
                 }
             }
+            catch (Exception grpcEx)
+            {
+                _logger.LogError(grpcEx, "rpc servicide ex");
+                throw;
+            }
             finally
             {
                 foreach (var sub in outboundEventSubscriptions)

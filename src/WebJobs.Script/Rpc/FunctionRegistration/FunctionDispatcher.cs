@@ -165,11 +165,11 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
 
         public async Task InitializeAsync(IEnumerable<FunctionMetadata> functions)
         {
-            if (_environment.IsPlaceholderModeEnabled())
+            if (functions == null || functions.Count() == 0)
             {
+                // do not initialize function dispachter if there are no functions
                 return;
             }
-
             _workerRuntime = _workerRuntime ?? Utility.GetWorkerRuntime(functions);
             _functions = functions;
             if (string.IsNullOrEmpty(_workerRuntime) || _workerRuntime.Equals(LanguageWorkerConstants.DotNetLanguageWorkerName, StringComparison.InvariantCultureIgnoreCase))
@@ -178,12 +178,6 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
                 // This is needed as specilization does not kill standby placeholder channels if worker runtime is not set.
                 // Debouce to ensure this does not effect cold start
                 _shutdownStandbyWorkerChannels();
-                return;
-            }
-
-            if (functions == null || functions.Count() == 0)
-            {
-                // do not initialize function dispachter if there are no functions
                 return;
             }
 
