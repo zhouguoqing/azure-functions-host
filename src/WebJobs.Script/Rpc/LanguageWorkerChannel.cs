@@ -5,7 +5,6 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
@@ -13,8 +12,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Features;
-
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Azure.WebJobs.Script.Eventing;
@@ -23,7 +20,7 @@ using Microsoft.Azure.WebJobs.Script.Grpc.Messages;
 using Microsoft.Azure.WebJobs.Script.ManagedDependencies;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
+
 using FunctionMetadata = Microsoft.Azure.WebJobs.Script.Description.FunctionMetadata;
 using MsgType = Microsoft.Azure.WebJobs.Script.Grpc.Messages.StreamingMessage.ContentOneofCase;
 
@@ -31,7 +28,7 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
 {
     internal class LanguageWorkerChannel : ILanguageWorkerChannel, IDisposable
     {
-        private readonly TimeSpan workerInitTimeout = TimeSpan.FromSeconds(1200);
+        private readonly TimeSpan workerInitTimeout = TimeSpan.FromSeconds(30);
         private readonly string _rootScriptPath;
         private readonly IScriptEventManager _eventManager;
         private readonly WorkerConfig _workerConfig;
@@ -130,54 +127,6 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
         internal void SendWorkerInitRequest(RpcEvent startEvent)
         {
             _workerChannelLogger.LogDebug("Worker Process started. Received StartStream message");
-            // JIT ToRPC
-            BindingMetadata bindingMetadataIn = new BindingMetadata()
-            {
-                Type = "httpTrigger",
-                Direction = BindingDirection.In,
-                Name = "req"
-            };
-
-            BindingMetadata bindingMetadataOut = new BindingMetadata()
-            {
-                Type = "http",
-                Direction = BindingDirection.Out,
-                Name = "res"
-            };
-
-            Collection<BindingMetadata> bindings = new Collection<BindingMetadata>()
-                {
-                    bindingMetadataIn,
-                    bindingMetadataOut
-                };
-
-            FunctionMetadata functionMetadata = new FunctionMetadata()
-            {
-                FunctionDirectory = @"D:\pgopaGit\azure-functions-nodejs-worker\test\end-to-end\testFunctionApp\HttpTrigger",
-                Language = "node",
-                Name = "HttpTrigger",
-                ScriptFile = @"D:\pgopaGit\azure-functions-nodejs-worker\test\end-to-end\testFunctionApp\HttpTrigger\index.js",
-                IsProxy = false,
-                IsDisabled = false,
-                IsDirect = false,
-                Bindings = bindings
-            };
-
-            ScriptInvocationContext scriptInvocationContext = new ScriptInvocationContext()
-            {
-                FunctionMetadata = functionMetadata,
-                ResultSource = new TaskCompletionSource<ScriptInvocationResult>()
-            };
-
-            var testInvokeRequest = GetTestHttpInvocationRequest(scriptInvocationContext);
-
-            _workerChannelLogger.LogDebug("Jitting ToRpc done:{FunctionId}", testInvokeRequest.FunctionId);
-
-            // JIT ToObject
-            TypedData testTypedData = GetTestRpcHttp();
-            testTypedData.ToObject();
-            _workerChannelLogger.LogDebug("Jitting ToObject done");
-
             _inboundWorkerEvents.Where(msg => msg.MessageType == MsgType.WorkerInitResponse)
                 .Timeout(workerInitTimeout)
                 .Take(1)
@@ -237,9 +186,20 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             {
                 foreach (FunctionMetadata metadata in _functions)
                 {
-                    SendFunctionLoadRequest(metadata, new TaskCompletionSource<bool>());
+                    SendFunctionLoadRequest(metadata);
                 }
             }
+        }
+
+        public void SendFunctionLoadRequest(FunctionMetadata metadata, TaskCompletionSource<bool> loadTask)
+        {
+            _workerChannelLogger.LogDebug("Sending FunctionLoadRequest for function:{functionName} with functionId:{id}", metadata.Name, metadata.FunctionId);
+            _loadTask = loadTask;
+            // send a load request for the registered function
+            SendStreamingMessage(new StreamingMessage
+            {
+                FunctionLoadRequest = GetFunctionLoadRequest(metadata)
+            });
         }
 
         public Task SendFunctionEnvironmentReloadRequest()
@@ -273,10 +233,10 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             return request;
         }
 
-        public void SendFunctionLoadRequest(FunctionMetadata metadata, TaskCompletionSource<bool> loadTask)
+        internal void SendFunctionLoadRequest(FunctionMetadata metadata)
         {
             _workerChannelLogger.LogDebug("Sending FunctionLoadRequest for function:{functionName} with functionId:{id}", metadata.Name, metadata.FunctionId);
-            _loadTask = loadTask;
+
             // send a load request for the registered function
             SendStreamingMessage(new StreamingMessage
             {
@@ -340,86 +300,59 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
         {
             try
             {
-                InvocationRequest invocationRequest = GetTestHttpInvocationRequest(context);
-                _executingInvocations.TryAdd(invocationRequest.InvocationId, context);
-                SendStreamingMessage(new StreamingMessage
+                if (_functionLoadErrors.ContainsKey(context.FunctionMetadata.FunctionId))
                 {
-                    InvocationRequest = invocationRequest
-                });
+                    _workerChannelLogger.LogDebug($"Function {context.FunctionMetadata.Name} failed to load");
+                    context.ResultSource.TrySetException(_functionLoadErrors[context.FunctionMetadata.FunctionId]);
+                    _executingInvocations.TryRemove(context.ExecutionContext.InvocationId.ToString(), out ScriptInvocationContext _);
+                }
+                else
+                {
+                    if (context.CancellationToken.IsCancellationRequested)
+                    {
+                        context.ResultSource.SetCanceled();
+                        return;
+                    }
+
+                    var functionMetadata = context.FunctionMetadata;
+
+                    InvocationRequest invocationRequest = new InvocationRequest()
+                    {
+                        FunctionId = functionMetadata.FunctionId,
+                        InvocationId = context.ExecutionContext.InvocationId.ToString(),
+                    };
+                    foreach (var pair in context.BindingData)
+                    {
+                        if (pair.Value != null)
+                        {
+                            if ((pair.Value is HttpRequest) && IsTriggerMetadataPopulatedByWorker())
+                            {
+                                continue;
+                            }
+                            invocationRequest.TriggerMetadata.Add(pair.Key, pair.Value.ToRpc(_workerChannelLogger, _workerCapabilities));
+                        }
+                    }
+                    foreach (var input in context.Inputs)
+                    {
+                        invocationRequest.InputData.Add(new ParameterBinding()
+                        {
+                            Name = input.name,
+                            Data = input.val.ToRpc(_workerChannelLogger, _workerCapabilities)
+                        });
+                    }
+
+                    _executingInvocations.TryAdd(invocationRequest.InvocationId, context);
+
+                    SendStreamingMessage(new StreamingMessage
+                    {
+                        InvocationRequest = invocationRequest
+                    });
+                }
             }
             catch (Exception invokeEx)
             {
                 context.ResultSource.TrySetException(invokeEx);
             }
-        }
-
-        private InvocationRequest GetTestHttpInvocationRequest(ScriptInvocationContext context)
-        {
-            InvocationRequest invocationRequest = new InvocationRequest()
-            {
-                FunctionId = context.FunctionMetadata.FunctionId,
-                InvocationId = Guid.NewGuid().ToString(),
-            };
-
-            invocationRequest.InputData.Add(new ParameterBinding()
-            {
-                            if ((pair.Value is HttpRequest) && IsTriggerMetadataPopulatedByWorker())
-                            {
-                                continue;
-                            }
-        }
-
-        private TypedData GetTestRpcHttp()
-        {
-            var headers = new HeaderDictionary();
-            headers.Add("content-type", "application/json");
-            HttpRequest request = CreateHttpRequest("GET", "http://localhost/api/httptrigger-scenarios", headers);
-            return request.ToRpc(_workerChannelLogger, _workerCapabilities);
-        }
-
-        public static HttpRequest CreateHttpRequest(string method, string uriString, IHeaderDictionary headers = null, object body = null)
-        {
-            var uri = new Uri(uriString);
-            var request = new DefaultHttpContext().Request;
-            var requestFeature = request.HttpContext.Features.Get<IHttpRequestFeature>();
-            requestFeature.Method = method;
-            requestFeature.Scheme = uri.Scheme;
-            requestFeature.Path = uri.GetComponents(UriComponents.KeepDelimiter | UriComponents.Path, UriFormat.Unescaped);
-            requestFeature.PathBase = string.Empty;
-            requestFeature.QueryString = uri.GetComponents(UriComponents.KeepDelimiter | UriComponents.Query, UriFormat.Unescaped);
-
-            headers = headers ?? new HeaderDictionary();
-
-            if (!string.IsNullOrEmpty(uri.Host))
-            {
-                headers.Add("Host", uri.Host);
-            }
-
-            if (body != null)
-            {
-                byte[] bytes = null;
-                if (body is string bodyString)
-                {
-                    bytes = Encoding.UTF8.GetBytes(bodyString);
-                }
-                else if (body is byte[] bodyBytes)
-                {
-                    bytes = bodyBytes;
-                }
-                else
-                {
-                    string bodyJson = JsonConvert.SerializeObject(body);
-                    bytes = Encoding.UTF8.GetBytes(bodyJson);
-                }
-
-                requestFeature.Body = new MemoryStream(bytes);
-                request.ContentLength = request.Body.Length;
-                headers.Add("Content-Length", request.Body.Length.ToString());
-            }
-
-            requestFeature.Headers = headers;
-
-            return request;
         }
 
         internal void InvokeResponse(InvocationResponse invokeResponse)

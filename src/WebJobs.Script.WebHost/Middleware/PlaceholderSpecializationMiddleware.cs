@@ -79,7 +79,9 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
                 // TODO: this should only be called for ultra mode
                 _standbyManager.SpecializeHostReloadConfig();
                 string scriptPath = _options.CurrentValue.ScriptPath;
-                ILanguageWorkerChannel channel = _webHostlanguageWorkerChannelManager.GetChannels("node").FirstOrDefault();
+                var channelTask = _webHostlanguageWorkerChannelManager.GetChannels("node").FirstOrDefault();
+                ILanguageWorkerChannel channel = await channelTask.Value.Task;
+
                 await channel.SendFunctionEnvironmentReloadRequest();
 
                 IEnumerable<FunctionMetadata> functions = ReadFunctionsMetadata(scriptPath, null, _workerConfigs);
