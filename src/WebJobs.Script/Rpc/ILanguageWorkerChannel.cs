@@ -27,6 +27,6 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
 
         void SendFunctionLoadRequest(FunctionMetadata metadata, TaskCompletionSource<bool> loadTask);
 
-        void SendInvocationRequest(ScriptInvocationContext scriptInvocationContext);
+        void SendInvocationRequest(ScriptInvocationContext scriptInvocationContext, bool sendTestHttpRequest = false);
     }
 }

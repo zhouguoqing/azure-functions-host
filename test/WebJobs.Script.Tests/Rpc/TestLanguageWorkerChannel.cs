@@ -101,5 +101,10 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Rpc
         {
             throw new NotImplementedException();
         }
+
+        public void SendInvocationRequest(ScriptInvocationContext scriptInvocationContext, bool sendTestHttpRequest = false)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

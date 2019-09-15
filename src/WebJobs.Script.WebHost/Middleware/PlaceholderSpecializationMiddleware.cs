@@ -100,7 +100,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
                     Logger = _loggerFactory.CreateLogger("HttpTrigger")
                 };
 
-                channel.SendInvocationRequest(scriptInvocationContext);
+                channel.SendInvocationRequest(scriptInvocationContext, true);
 
                 var t = await scriptInvocationContext.ResultSource.Task;
 

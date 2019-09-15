@@ -8,10 +8,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Azure.WebJobs.Script.Eventing;
@@ -20,7 +22,7 @@ using Microsoft.Azure.WebJobs.Script.Grpc.Messages;
 using Microsoft.Azure.WebJobs.Script.ManagedDependencies;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-
+using Newtonsoft.Json;
 using FunctionMetadata = Microsoft.Azure.WebJobs.Script.Description.FunctionMetadata;
 using MsgType = Microsoft.Azure.WebJobs.Script.Grpc.Messages.StreamingMessage.ContentOneofCase;
 
@@ -296,57 +298,139 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             _loadTask?.SetResult(true);
         }
 
-        public void SendInvocationRequest(ScriptInvocationContext context)
+        private TypedData GetTestRpcHttp()
         {
-            try
+            var headers = new HeaderDictionary();
+            headers.Add("content-type", "application/json");
+            HttpRequest request = CreateHttpRequest("GET", "http://localhost/api/httptrigger-scenarios", headers);
+            return request.ToRpc(_workerChannelLogger, _workerCapabilities);
+        }
+
+        public static HttpRequest CreateHttpRequest(string method, string uriString, IHeaderDictionary headers = null, object body = null)
+        {
+            var uri = new Uri(uriString);
+            var request = new DefaultHttpContext().Request;
+            var requestFeature = request.HttpContext.Features.Get<IHttpRequestFeature>();
+            requestFeature.Method = method;
+            requestFeature.Scheme = uri.Scheme;
+            requestFeature.Path = uri.GetComponents(UriComponents.KeepDelimiter | UriComponents.Path, UriFormat.Unescaped);
+            requestFeature.PathBase = string.Empty;
+            requestFeature.QueryString = uri.GetComponents(UriComponents.KeepDelimiter | UriComponents.Query, UriFormat.Unescaped);
+
+            headers = headers ?? new HeaderDictionary();
+
+            if (!string.IsNullOrEmpty(uri.Host))
             {
-                if (_functionLoadErrors.ContainsKey(context.FunctionMetadata.FunctionId))
+                headers.Add("Host", uri.Host);
+            }
+
+            if (body != null)
+            {
+                byte[] bytes = null;
+                if (body is string bodyString)
                 {
-                    _workerChannelLogger.LogDebug($"Function {context.FunctionMetadata.Name} failed to load");
-                    context.ResultSource.TrySetException(_functionLoadErrors[context.FunctionMetadata.FunctionId]);
-                    _executingInvocations.TryRemove(context.ExecutionContext.InvocationId.ToString(), out ScriptInvocationContext _);
+                    bytes = Encoding.UTF8.GetBytes(bodyString);
+                }
+                else if (body is byte[] bodyBytes)
+                {
+                    bytes = bodyBytes;
                 }
                 else
                 {
-                    if (context.CancellationToken.IsCancellationRequested)
-                    {
-                        context.ResultSource.SetCanceled();
-                        return;
-                    }
+                    string bodyJson = JsonConvert.SerializeObject(body);
+                    bytes = Encoding.UTF8.GetBytes(bodyJson);
+                }
 
-                    var functionMetadata = context.FunctionMetadata;
+                requestFeature.Body = new MemoryStream(bytes);
+                request.ContentLength = request.Body.Length;
+                headers.Add("Content-Length", request.Body.Length.ToString());
+            }
 
-                    InvocationRequest invocationRequest = new InvocationRequest()
-                    {
-                        FunctionId = functionMetadata.FunctionId,
-                        InvocationId = context.ExecutionContext.InvocationId.ToString(),
-                    };
-                    foreach (var pair in context.BindingData)
-                    {
-                        if (pair.Value != null)
-                        {
-                            if ((pair.Value is HttpRequest) && IsTriggerMetadataPopulatedByWorker())
-                            {
-                                continue;
-                            }
-                            invocationRequest.TriggerMetadata.Add(pair.Key, pair.Value.ToRpc(_workerChannelLogger, _workerCapabilities));
-                        }
-                    }
-                    foreach (var input in context.Inputs)
-                    {
-                        invocationRequest.InputData.Add(new ParameterBinding()
-                        {
-                            Name = input.name,
-                            Data = input.val.ToRpc(_workerChannelLogger, _workerCapabilities)
-                        });
-                    }
+            requestFeature.Headers = headers;
 
+            return request;
+        }
+
+        private InvocationRequest GetTestHttpInvocationRequest(ScriptInvocationContext context)
+        {
+            InvocationRequest invocationRequest = new InvocationRequest()
+            {
+                FunctionId = context.FunctionMetadata.FunctionId,
+                InvocationId = Guid.NewGuid().ToString(),
+            };
+
+            invocationRequest.InputData.Add(new ParameterBinding()
+            {
+                Name = "testHttpRequest",
+                Data = GetTestRpcHttp()
+            });
+            return invocationRequest;
+        }
+
+        public void SendInvocationRequest(ScriptInvocationContext context, bool sendTestHttpRequest = false)
+        {
+            try
+            {
+                // used for fast path skipping webjobs sdk that populates bindings
+                if (sendTestHttpRequest)
+                {
+                    InvocationRequest invocationRequest = GetTestHttpInvocationRequest(context);
                     _executingInvocations.TryAdd(invocationRequest.InvocationId, context);
-
                     SendStreamingMessage(new StreamingMessage
                     {
                         InvocationRequest = invocationRequest
                     });
+                }
+                else
+                {
+                    if (_functionLoadErrors.ContainsKey(context.FunctionMetadata.FunctionId))
+                    {
+                        _workerChannelLogger.LogDebug($"Function {context.FunctionMetadata.Name} failed to load");
+                        context.ResultSource.TrySetException(_functionLoadErrors[context.FunctionMetadata.FunctionId]);
+                        _executingInvocations.TryRemove(context.ExecutionContext.InvocationId.ToString(), out ScriptInvocationContext _);
+                    }
+                    else
+                    {
+                        if (context.CancellationToken.IsCancellationRequested)
+                        {
+                            context.ResultSource.SetCanceled();
+                            return;
+                        }
+
+                        var functionMetadata = context.FunctionMetadata;
+
+                        InvocationRequest invocationRequest = new InvocationRequest()
+                        {
+                            FunctionId = functionMetadata.FunctionId,
+                            InvocationId = context.ExecutionContext.InvocationId.ToString(),
+                        };
+                        foreach (var pair in context.BindingData)
+                        {
+                            if (pair.Value != null)
+                            {
+                                if ((pair.Value is HttpRequest) && IsTriggerMetadataPopulatedByWorker())
+                                {
+                                    continue;
+                                }
+                                invocationRequest.TriggerMetadata.Add(pair.Key, pair.Value.ToRpc(_workerChannelLogger, _workerCapabilities));
+                            }
+                        }
+                        foreach (var input in context.Inputs)
+                        {
+                            invocationRequest.InputData.Add(new ParameterBinding()
+                            {
+                                Name = input.name,
+                                Data = input.val.ToRpc(_workerChannelLogger, _workerCapabilities)
+                            });
+                        }
+
+                        _executingInvocations.TryAdd(invocationRequest.InvocationId, context);
+
+                        SendStreamingMessage(new StreamingMessage
+                        {
+                            InvocationRequest = invocationRequest
+                        });
+                    }
                 }
             }
             catch (Exception invokeEx)
