@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Azure.WebJobs.Logging;
 using Microsoft.Azure.WebJobs.Script.Abstractions;
 using Microsoft.Azure.WebJobs.Script.Eventing;
@@ -61,7 +62,7 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
 
         internal Queue<string> ProcessStdErrDataQueue => _processStdErrDataQueue;
 
-        public void StartProcess()
+        public Task StartProcessAsync()
         {
             try
             {
@@ -79,10 +80,12 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
 
                 // Register process only after it starts
                 _processRegistry?.Register(_process);
+                return Task.CompletedTask;
             }
             catch (Exception ex)
             {
-                throw new HostInitializationException($"Failed to start Language Worker Channel for language :{_runtime}", ex);
+                _workerProcessLogger.LogError(ex, "Failed to start Language Worker Channel for language :{_runtime}", _runtime);
+                return Task.FromException(ex);
             }
         }
 
@@ -144,16 +147,20 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             string exceptionMessage = string.Join(",", _processStdErrDataQueue.Where(s => !string.IsNullOrEmpty(s)));
             try
             {
-                if (_process.ExitCode != 0)
+                if (_process.ExitCode == LanguageWorkerConstants.SuccessExitCode)
+                {
+                    _process.WaitForExit();
+                    _process.Close();
+                }
+                else if (_process.ExitCode == LanguageWorkerConstants.IntentionalRestartExitCode)
+                {
+                    HandleWorkerProcessRestart();
+                }
+                else
                 {
                     var processExitEx = new LanguageWorkerProcessExitException($"{_process.StartInfo.FileName} exited with code {_process.ExitCode}\n {exceptionMessage}");
                     processExitEx.ExitCode = _process.ExitCode;
                     HandleWorkerProcessExitError(processExitEx);
-                }
-                else
-                {
-                    _process.WaitForExit();
-                    _process.Close();
                 }
             }
             catch (Exception)
@@ -187,6 +194,12 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
                 _workerProcessLogger.LogDebug(langExc, $"Language Worker Process exited.", _process.StartInfo.FileName);
                 _eventManager.Publish(new WorkerErrorEvent(_runtime, _workerId, langExc));
             }
+        }
+
+        internal void HandleWorkerProcessRestart()
+        {
+            _workerProcessLogger?.LogInformation("Language Worker Process exited and needs to be restarted.");
+            _eventManager.Publish(new WorkerRestartEvent(_runtime, _workerId));
         }
 
         public void Dispose()

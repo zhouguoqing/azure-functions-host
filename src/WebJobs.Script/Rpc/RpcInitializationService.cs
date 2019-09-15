@@ -32,7 +32,11 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             },
             {
                 OSPlatform.Linux,
-                new List<string>() { LanguageWorkerConstants.NodeLanguageWorkerName }
+                new List<string>()
+                {
+                    LanguageWorkerConstants.PythonLanguageWorkerName,
+                    LanguageWorkerConstants.NodeLanguageWorkerName
+                }
             }
         };
 
@@ -65,11 +69,10 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             _logger.LogDebug("Rpc Initialization Service started.");
         }
 
-        public Task StopAsync(CancellationToken cancellationToken)
+        public async Task StopAsync(CancellationToken cancellationToken)
         {
             _logger.LogDebug("Shuttingdown Rpc Channels Manager");
-            _webHostlanguageWorkerChannelManager.ShutdownChannels();
-            return Task.CompletedTask;
+            await _webHostlanguageWorkerChannelManager.ShutdownChannelsAsync();
         }
 
         public async Task OuterStopAsync(CancellationToken cancellationToken)
@@ -147,9 +150,18 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             return Task.CompletedTask;
         }
 
-        private bool ShouldStartInPlaceholderMode()
+        internal bool ShouldStartInPlaceholderMode()
         {
-            return string.IsNullOrEmpty(_workerRuntime) && _environment.IsPlaceholderModeEnabled();
+            if (string.IsNullOrEmpty(_workerRuntime) && _environment.IsPlaceholderModeEnabled())
+            {
+                if (_environment.IsLinuxHostingEnvironment())
+                {
+                    return true;
+                }
+                // On Windows AppService Env, only start worker processes for legacy template site: FunctionsPlaceholderTemplateSite
+                return _environment.IsLegacyPlaceholderTemplateSite();
+            }
+            return false;
         }
 
         // To help with unit tests

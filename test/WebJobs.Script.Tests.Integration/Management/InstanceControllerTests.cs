@@ -45,15 +45,15 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Managment
             handlerMock.Protected().Setup<Task<HttpResponseMessage>>("SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>()).ReturnsAsync(new HttpResponseMessage
-            {
-                StatusCode = HttpStatusCode.BadRequest
-            });
+                {
+                    StatusCode = HttpStatusCode.BadRequest
+                });
 
             var instanceManager = new InstanceManager(_optionsFactory, new HttpClient(handlerMock.Object), scriptWebEnvironment, environment, loggerFactory.CreateLogger<InstanceManager>(), new TestMetricsLogger());
 
             InstanceManager.Reset();
 
-            var instanceController = new InstanceController(environment, instanceManager);
+            var instanceController = new InstanceController(environment, instanceManager, loggerFactory);
 
             const string containerEncryptionKey = "/a/vXvWJ3Hzgx4PFxlDUJJhQm5QVyGiu0NNLFm/ZMMg=";
             var hostAssignmentContext = new HostAssignmentContext
