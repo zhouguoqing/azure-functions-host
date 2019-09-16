@@ -172,7 +172,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             Directory.CreateDirectory(functionPath);
             content = FileUtility.ReadResourceString($"{ScriptConstants.ResourcePath}.Functions.{WarmUpConstants.FunctionName}.function.json");
             File.WriteAllText(Path.Combine(functionPath, "function.json"), content);
-            content = FileUtility.ReadResourceString($"{ScriptConstants.ResourcePath}.Functions.{WarmUpConstants.FunctionName}.run.csx");
+            content = FileUtility.ReadResourceString($"{ScriptConstants.ResourcePath}.Functions.{WarmUpConstants.FunctionName}.index.js");
             File.WriteAllText(Path.Combine(functionPath, "run.csx"), content);
 
             _logger.LogInformation($"StandbyMode placeholder function directory created");
