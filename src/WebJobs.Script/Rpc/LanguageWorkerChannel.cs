@@ -38,7 +38,7 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
 
         private bool _disposed;
         private bool _disposing;
-        private TaskCompletionSource<bool> _loadTask;
+        private TaskCompletionSource<bool> _loadTask = new TaskCompletionSource<bool>();
         private WorkerInitResponse _initMessage;
         private string _workerId;
         private LanguageWorkerChannelState _state;
@@ -193,15 +193,18 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             }
         }
 
-        public void SendFunctionLoadRequest(FunctionMetadata metadata, TaskCompletionSource<bool> loadTask)
+        public async Task SendFunctionLoadRequestAsync(FunctionMetadata metadata, bool fastPath)
         {
             _workerChannelLogger.LogDebug("Sending FunctionLoadRequest for function:{functionName} with functionId:{id}", metadata.Name, metadata.FunctionId);
-            _loadTask = loadTask;
             // send a load request for the registered function
             SendStreamingMessage(new StreamingMessage
             {
                 FunctionLoadRequest = GetFunctionLoadRequest(metadata)
             });
+            if (fastPath)
+            {
+                await _loadTask.Task;
+            }
         }
 
         public Task SendFunctionEnvironmentReloadRequest()
@@ -295,7 +298,15 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
             // associate the invocation input buffer with the function
             var disposableLink = _functionInputBuffers[loadResponse.FunctionId].LinkTo(invokeBlock);
             _inputLinks.Add(disposableLink);
-            _loadTask?.SetResult(true);
+            // TODO: figure out if fast path
+            try
+            {
+                _loadTask?.SetResult(true);
+            }
+            catch (Exception)
+            {
+                //ignore only need to set this Task once when running in fast path
+            }
         }
 
         private TypedData GetTestRpcHttp()

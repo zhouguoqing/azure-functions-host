@@ -97,12 +97,17 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Rpc
             _eventManager.Publish(new WorkerErrorEvent(_runtime, Id, testEx, timestamp));
         }
 
-        public void SendFunctionLoadRequest(FunctionMetadata metadata, TaskCompletionSource<bool> loadTask)
+        public void SendFunctionLoadRequest(FunctionMetadata metadata, bool fastPath = false)
         {
             throw new NotImplementedException();
         }
 
         public void SendInvocationRequest(ScriptInvocationContext scriptInvocationContext, bool sendTestHttpRequest = false)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task SendFunctionLoadRequestAsync(FunctionMetadata metadata, bool fastPath)
         {
             throw new NotImplementedException();
         }

@@ -25,7 +25,7 @@ namespace Microsoft.Azure.WebJobs.Script.Rpc
 
         Task StartWorkerProcessAsync();
 
-        void SendFunctionLoadRequest(FunctionMetadata metadata, TaskCompletionSource<bool> loadTask);
+        Task SendFunctionLoadRequestAsync(FunctionMetadata metadata, bool fastPath);
 
         void SendInvocationRequest(ScriptInvocationContext scriptInvocationContext, bool sendTestHttpRequest = false);
     }

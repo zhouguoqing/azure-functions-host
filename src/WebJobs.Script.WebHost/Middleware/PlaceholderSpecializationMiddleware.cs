@@ -86,9 +86,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
 
                 IEnumerable<FunctionMetadata> functions = ReadFunctionsMetadata(scriptPath, null, _workerConfigs);
                 channel.SetupFunctionInvocationBuffers(functions);
-                TaskCompletionSource<bool> loadTask = new TaskCompletionSource<bool>();
-                channel.SendFunctionLoadRequest(functions.ElementAt(0), loadTask);
-                await loadTask.Task;
+                await channel.SendFunctionLoadRequestAsync(functions.ElementAt(0), true);
                 ScriptInvocationContext scriptInvocationContext = new ScriptInvocationContext()
                 {
                     FunctionMetadata = functions.ElementAt(0),
