@@ -68,7 +68,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             // Ensure the HTTP binding routing is registered after all middleware
             builder.UseHttpBindingRouting(applicationLifetime, routes);
 
-            builder.UseMvc();
+            // builder.UseMvc();
 
             return builder;
         }
