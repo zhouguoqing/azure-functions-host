@@ -5,12 +5,12 @@
     <LangVersion>7.2</LangVersion>
     <RuntimeReleaseSuffix></RuntimeReleaseSuffix>
     <BuildNumber Condition=" '$(BuildNumber)' == '' ">1</BuildNumber>
-    <MajorMinorProductVersion>2.0</MajorMinorProductVersion>
+    <MajorMinorProductVersion>3.0</MajorMinorProductVersion>
     <Version>$(MajorMinorProductVersion).0$(RuntimeReleaseSuffix)$(VersionSuffix)</Version>
     <AssemblyVersion>$(MajorMinorProductVersion).0.0</AssemblyVersion>
     <FileVersion>$(MajorMinorProductVersion).$(BuildNumber).0</FileVersion>
     <CommitHash Condition="$(CommitHash) == ''">N/A</CommitHash>
-    <InformationalVersion>$(FileVersion)$(RuntimeReleaseSuffix) Commit hash: $(CommitHash)</InformationalVersion>  
+    <InformationalVersion>$(FileVersion)$(RuntimeReleaseSuffix) Commit hash: $(CommitHash)</InformationalVersion>
     <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)..\src.ruleset</CodeAnalysisRuleSet>
     <NoWarn>$(NoWarn);NU1701</NoWarn>
     <DebugType>embedded</DebugType>
@@ -20,7 +20,7 @@
   <PropertyGroup Condition="'$(UseSourceLink)' == 'true'">
     <SourceLink>$(BaseIntermediateOutputPath)source_link.json</SourceLink>
   </PropertyGroup>
-  
+
   <Target Name="GenerateSourceLink" BeforeTargets="CoreCompile" Condition="'$(UseSourceLink)' == 'true'">
     <PropertyGroup>
       <SrcRootDirectory>$([System.IO.Directory]::GetParent($(MSBuildThisFileDirectory.TrimEnd("\"))))</SrcRootDirectory>
@@ -38,7 +38,7 @@
     <!-- Write out the source file for this project to point at raw.githubusercontent.com -->
     <WriteLinesToFile File="$(BaseIntermediateOutputPath)source_link.json" Overwrite="true" Lines='{"documents": { "$(SourceLinkRoot)\\*" : "$(RemoteUri.Replace(".git", "").Replace("github.com", "raw.githubusercontent.com"))/$(LatestCommit)/*" }}' />
   </Target>
-  
+
   <ItemGroup>
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)..\stylecop.json" Link="stylecop.json" />
   </ItemGroup>
