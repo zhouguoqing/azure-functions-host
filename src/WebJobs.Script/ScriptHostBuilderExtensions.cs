@@ -71,7 +71,7 @@ namespace Microsoft.Azure.WebJobs.Script
                 loggingBuilder.Services.AddSingleton<ILoggerProvider, HostFileLoggerProvider>();
                 loggingBuilder.Services.AddSingleton<ILoggerProvider, FunctionFileLoggerProvider>();
 
-                loggingBuilder.AddConsoleIfEnabled(context);
+                // loggingBuilder.AddConsoleIfEnabled(context);
 
                 ConfigureApplicationInsights(context, loggingBuilder);
             })
