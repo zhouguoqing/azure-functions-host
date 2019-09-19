@@ -15,7 +15,7 @@ namespace Microsoft.AspNetCore.Http
             // TODO - remove the need for this
             // in some cases HttpResponse.HasStarted isn't returning the correct
             // value. This extension is a workaround.
-            if (response.HasStarted || response.ContentLength > 0 || (response.Body != null && response.Body.Length > 0))
+            if (response.HasStarted || response.ContentLength > 0)
             {
                 return true;
             }
