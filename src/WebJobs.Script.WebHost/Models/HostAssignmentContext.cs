@@ -26,6 +26,11 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Models
 
         public long? PackageContentLength { get; set; }
 
+        public string PackagePathInAzureFiles
+            => Environment.ContainsKey("WEBSITE_PACKAGE_PATH_AZURE_FILES")
+                ? Environment["WEBSITE_PACKAGE_PATH_AZURE_FILES"]
+                : string.Empty;
+
         public string AzureFilesConnectionString
             => Environment.ContainsKey(EnvironmentSettingNames.AzureFilesConnectionString)
                 ? Environment[EnvironmentSettingNames.AzureFilesConnectionString]

@@ -268,6 +268,13 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             {
                 await ApplyBlobPackageContext(pkgContext, options.ScriptPath);
             }
+            else if (!string.IsNullOrEmpty(assignmentContext.PackagePathInAzureFiles))
+            {
+                await MountCifs(assignmentContext.AzureFilesConnectionString, assignmentContext.AzureFilesContentShare, "/mnt/azure-files");
+                var packagePath = Path.Combine("/mnt/azure-files", assignmentContext.PackagePathInAzureFiles);
+                var packageType = GetPackageType(packagePath, pkgContext);
+                await MountFuse(packageType, packagePath, options.ScriptPath);
+            }
             else if (!string.IsNullOrEmpty(assignmentContext.AzureFilesConnectionString))
             {
                 await MountCifs(assignmentContext.AzureFilesConnectionString, assignmentContext.AzureFilesContentShare, "/home");
@@ -376,7 +383,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
                 }
                 else
                 {
-                    await MountFuse("squashfs", filePath, scriptPath);
+                    await MountFuse(CodePackageType.Squashfs, filePath, scriptPath);
                 }
             }
             else if (packageType == CodePackageType.Zip)
@@ -384,7 +391,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
                 // default to unzip for zip packages
                 if (_environment.IsMountEnabled())
                 {
-                    await MountFuse("zip", filePath, scriptPath);
+                    await MountFuse(CodePackageType.Zip, filePath, scriptPath);
                 }
                 else
                 {
@@ -401,7 +408,15 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
                 return CodePackageType.Squashfs;
             }
 
-            var uri = new Uri(pkgContext.Url);
+            Uri uri;
+            if (string.IsNullOrEmpty(pkgContext.Url))
+            {
+                uri = new Uri(filePath);
+            }
+            else
+            {
+                uri = new Uri(pkgContext.Url);
+            }
             // check file name since it'll be faster than running `file`
             if (FileIsAny(".squashfs", ".sfs", ".sqsh", ".img", ".fs"))
             {
@@ -444,10 +459,10 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
         private void UnsquashImage(string filePath, string scriptPath)
             => RunBashCommand($"unsquashfs -f -d '{scriptPath}' '{filePath}'", MetricEventNames.LinuxContainerSpecializationUnsquash);
 
-        private async Task MountFuse(string type, string filePath, string scriptPath)
+        private async Task MountFuse(CodePackageType type, string filePath, string scriptPath)
             => await Mount(new[]
             {
-                new KeyValuePair<string, string>("operation", type),
+                new KeyValuePair<string, string>("operation", type.ToString().ToLowerInvariant()),
                 new KeyValuePair<string, string>("filePath", filePath),
                 new KeyValuePair<string, string>("targetPath", scriptPath),
             });
