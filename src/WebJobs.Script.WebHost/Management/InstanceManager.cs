@@ -263,17 +263,17 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             var options = _optionsFactory.Create(ScriptApplicationHostOptionsSetup.SkipPlaceholder);
             RunFromPackageContext pkgContext = assignmentContext.GetRunFromPkgContext();
 
-            if ((pkgContext.IsScmRunFromPackage() && await pkgContext.BlobExistsAsync(_logger)) ||
-                (!pkgContext.IsScmRunFromPackage() && !string.IsNullOrEmpty(pkgContext.Url) && pkgContext.Url != "1"))
-            {
-                await ApplyBlobPackageContext(pkgContext, options.ScriptPath);
-            }
-            else if (!string.IsNullOrEmpty(assignmentContext.PackagePathInAzureFiles))
+            if (!string.IsNullOrEmpty(assignmentContext.PackagePathInAzureFiles))
             {
                 await MountCifs(assignmentContext.AzureFilesConnectionString, assignmentContext.AzureFilesContentShare, "/mnt/azure-files");
                 var packagePath = Path.Combine("/mnt/azure-files", assignmentContext.PackagePathInAzureFiles);
                 var packageType = GetPackageType(packagePath, pkgContext);
                 await MountFuse(packageType, packagePath, options.ScriptPath);
+            }
+            else if ((pkgContext.IsScmRunFromPackage() && await pkgContext.BlobExistsAsync(_logger)) ||
+                (!pkgContext.IsScmRunFromPackage() && !string.IsNullOrEmpty(pkgContext.Url) && pkgContext.Url != "1"))
+            {
+                await ApplyBlobPackageContext(pkgContext, options.ScriptPath);
             }
             else if (!string.IsNullOrEmpty(assignmentContext.AzureFilesConnectionString))
             {
