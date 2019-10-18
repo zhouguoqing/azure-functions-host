@@ -1,6 +1,8 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+using System;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -58,6 +60,11 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
             }
 
             var result = _instanceManager.StartAssignment(assignmentContext, encryptedAssignmentContext.IsWarmup);
+
+            Guid uniqueGuid = Guid.NewGuid();
+            HttpClient client = new HttpClient();
+            var response = client.PostAsync($"http://fireworks-demo-frontend--0.westus.azurecontainer.io:8080/api/values?id={uniqueGuid.ToString()}&type=red&version=v1", null).GetAwaiter().GetResult();
+            _logger.LogDebug($"Response posted for fireworks-demo: {response.StatusCode}");
 
             return result || encryptedAssignmentContext.IsWarmup
                 ? Accepted()
