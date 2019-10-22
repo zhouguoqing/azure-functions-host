@@ -16,5 +16,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
         bool StartAssignment(HostAssignmentContext assignmentContext, bool isWarmup);
 
         Task<string> SpecializeMSISidecar(HostAssignmentContext assignmentContext, bool isWarmup);
+
+        bool IsWarmedUpInstance();
     }
 }

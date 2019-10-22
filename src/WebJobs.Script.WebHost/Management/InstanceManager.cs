@@ -41,7 +41,10 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             _metricsLogger = metricsLogger;
             _environment = environment ?? throw new ArgumentNullException(nameof(environment));
             _optionsFactory = optionsFactory ?? throw new ArgumentNullException(nameof(optionsFactory));
+            IsWarmedUp = false;
         }
+
+        private bool IsWarmedUp { get; set; }
 
         public async Task<string> SpecializeMSISidecar(HostAssignmentContext context, bool isWarmup)
         {
@@ -96,6 +99,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
 
             if (isWarmup)
             {
+                IsWarmedUp = true;
                 return true;
             }
             else if (_assignmentContext == null)
@@ -524,6 +528,11 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
                 { "FUNCTIONS_EXTENSION_VERSION", ScriptHost.Version },
                 { "WEBSITE_NODE_DEFAULT_VERSION", "8.5.0" }
             };
+        }
+
+        public bool IsWarmedUpInstance()
+        {
+            return IsWarmedUp;
         }
 
         // for testing
