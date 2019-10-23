@@ -77,7 +77,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
         [Authorize(Policy = PolicyNames.AdminAuthLevel)]
         public IActionResult IsWarmedUpInstance()
         {
-            return _instanceManager.IsWarmedUpInstance() ? Ok() : StatusCode(StatusCodes.Status502BadGateway);
+            return Ok(_instanceManager.IsWarmedUpInstance());
         }
     }
 }
