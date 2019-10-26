@@ -63,7 +63,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
 
             Guid uniqueGuid = Guid.NewGuid();
             HttpClient client = new HttpClient();
-            var response = client.PostAsync($"http://fireworks-demo-frontend--0.westus.azurecontainer.io:8080/api/values?id={uniqueGuid.ToString()}&type=red&version=v1", null).GetAwaiter().GetResult();
+            var response = client.PostAsync($"http://fireworks-demo.westus.azurecontainer.io:8080/api/values?id={uniqueGuid.ToString()}&type=red&version=v1", null).GetAwaiter().GetResult();
             _logger.LogDebug($"Response posted for fireworks-demo: {response.StatusCode}");
 
             return result || encryptedAssignmentContext.IsWarmup
