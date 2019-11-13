@@ -36,42 +36,43 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args = null)
         {
-            return AspNetCore.WebHost.CreateDefaultBuilder(args)
-                .ConfigureKestrel(o =>
-                {
-                    o.Limits.MaxRequestBodySize = 104857600;
-                })
-                .UseSetting(WebHostDefaults.EnvironmentKey, Environment.GetEnvironmentVariable(EnvironmentSettingNames.EnvironmentNameKey))
-                .ConfigureServices(services =>
-                {
-                    services.Replace(ServiceDescriptor.Singleton<IServiceProviderFactory<IServiceCollection>>(new WebHostServiceProviderFactory()));
-                })
-                .ConfigureAppConfiguration((builderContext, config) =>
-                {
-                    // replace the default environment source with our own
-                    IConfigurationSource envVarsSource = config.Sources.OfType<EnvironmentVariablesConfigurationSource>().FirstOrDefault();
-                    if (envVarsSource != null)
-                    {
-                        config.Sources.Remove(envVarsSource);
-                    }
+            //return AspNetCore.WebHost.CreateDefaultBuilder(args)
+            //    .ConfigureKestrel(o =>
+            //    {
+            //        o.Limits.MaxRequestBodySize = 104857600;
+            //    })
+            //    .UseSetting(WebHostDefaults.EnvironmentKey, Environment.GetEnvironmentVariable(EnvironmentSettingNames.EnvironmentNameKey))
+            //    .ConfigureServices(services =>
+            //    {
+            //        services.Replace(ServiceDescriptor.Singleton<IServiceProviderFactory<IServiceCollection>>(new WebHostServiceProviderFactory()));
+            //    })
+            //    .ConfigureAppConfiguration((builderContext, config) =>
+            //    {
+            //        // replace the default environment source with our own
+            //        IConfigurationSource envVarsSource = config.Sources.OfType<EnvironmentVariablesConfigurationSource>().FirstOrDefault();
+            //        if (envVarsSource != null)
+            //        {
+            //            config.Sources.Remove(envVarsSource);
+            //        }
 
-                    config.Add(new ScriptEnvironmentVariablesConfigurationSource());
+            //        config.Add(new ScriptEnvironmentVariablesConfigurationSource());
 
-                    config.Add(new WebScriptHostConfigurationSource
-                    {
-                        IsAppServiceEnvironment = SystemEnvironment.Instance.IsAppService(),
-                        IsLinuxContainerEnvironment = SystemEnvironment.Instance.IsLinuxConsumption(),
-                        IsLinuxAppServiceEnvironment = SystemEnvironment.Instance.IsLinuxAppService()
-                    });
-                })
-                .ConfigureLogging((context, loggingBuilder) =>
-                {
-                    loggingBuilder.ClearProviders();
+            //        config.Add(new WebScriptHostConfigurationSource
+            //        {
+            //            IsAppServiceEnvironment = SystemEnvironment.Instance.IsAppService(),
+            //            IsLinuxContainerEnvironment = SystemEnvironment.Instance.IsLinuxConsumption(),
+            //            IsLinuxAppServiceEnvironment = SystemEnvironment.Instance.IsLinuxAppService()
+            //        });
+            //    })
+            //    .ConfigureLogging((context, loggingBuilder) =>
+            //    {
+            //        loggingBuilder.ClearProviders();
 
-                    loggingBuilder.AddDefaultWebJobsFilters();
-                    loggingBuilder.AddWebJobsSystem<WebHostSystemLoggerProvider>();
-                })
-                .UseStartup<Startup>();
+            //        loggingBuilder.AddDefaultWebJobsFilters();
+            //        loggingBuilder.AddWebJobsSystem<WebHostSystemLoggerProvider>();
+            //    })
+            //    .UseStartup<Startup>();
+            throw new InvalidOperationException();
         }
 
         /// <summary>
