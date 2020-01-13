@@ -1,0 +1,548 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-08-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "suffix": {
+            "type": "int",
+            "metadata": {
+                "description": "An integer used as a suffix for all resources created. E.g. azurefunctionshostci{suffix}."
+            }
+        },
+        "azurePipelinesAadAppObjectId": {
+            "type": "string",
+            "metadata": {
+                "description": "The object id of the application used by Azure pipelines to access KeyVault secrets. Application name can be found in the pipeline project Service connections."
+            }
+        },
+        "functionsTestAadAppId": {
+            "type": "string",
+            "metadata": {
+                "description": "The AAD application id used to generate a connection string for KeyVault tests."
+            }
+        },
+        "functionsTestAadAppObjectId": {
+            "type": "string",
+            "metadata": {
+                "description": "The object id of the AAD application used by Functions tests to access KeyVault secrets."
+            }
+        },
+        "functionsTestAadAppClientSecret": {
+            "type": "string",
+            "metadata": {
+                "description": "The client secret used to generate a connection string for KeyVault tests."
+            }
+        }
+    },
+    "variables": {
+        "rg_name": "[concat('azure-functions-host-ci-', parameters('suffix'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Resources/resourceGroups",
+            "apiVersion": "2018-05-01",
+            "location": "[deployment().location]",
+            "name": "[variables('rg_name')]",
+            "properties": {
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2017-05-10",
+            "name": "[concat('ci', parameters('suffix'))]",
+            "resourceGroup": "[variables('rg_name')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/resourceGroups/', variables('rg_name'))]"
+            ],
+            "properties": {
+                "parameters": {
+                    "suffix": {
+                        "value": "[parameters('suffix')]"
+                    },
+                    "azurePipelinesAadAppObjectId": {
+                        "value": "[parameters('azurePipelinesAadAppObjectId')]"
+                    },
+                    "functionsTestAadAppId": {
+                        "value": "[parameters('functionsTestAadAppId')]"
+                    },
+                    "functionsTestAadAppObjectId": {
+                        "value": "[parameters('functionsTestAadAppObjectId')]"
+                    },
+                    "functionsTestAadAppClientSecret": {
+                        "value": "[parameters('functionsTestAadAppClientSecret')]"
+                    }
+                },
+                "expressionEvaluationOptions": {
+                    "scope": "inner"
+                },
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "suffix": {
+                            "type": "int"
+                        },
+                        "azurePipelinesAadAppObjectId": {
+                            "type": "string"
+                        },
+                        "functionsTestAadAppId": {
+                            "type": "string"
+                        },
+                        "functionsTestAadAppObjectId": {
+                            "type": "string"
+                        },
+                        "functionsTestAadAppClientSecret": {
+                            "type": "string"
+                        }
+                    },
+                    "variables": {
+                        "cosmos_name": "[concat('azurefunctionshostci', parameters('suffix'))]",
+                        "eventhub_name": "[concat('azurefunctionshostci', parameters('suffix'))]",
+                        "keyvault_test_name": "[concat('azurefunctionshostci', parameters('suffix'))]",
+                        "keyvault_name": "[concat('azure-functions-host-ci', parameters('suffix'))]",
+                        "storageAccount_name": "[concat('azurefunctionshostci', parameters('suffix'))]"
+                    },
+                    "resources": [
+                        {
+                            "type": "Microsoft.DocumentDB/databaseAccounts",
+                            "apiVersion": "2019-08-01",
+                            "name": "[variables('cosmos_name')]",
+                            "location": "[resourceGroup().location]",
+                            "tags": {
+                                "defaultExperience": "Core (SQL)"
+                            },
+                            "kind": "GlobalDocumentDB",
+                            "properties": {
+                                "enableAutomaticFailover": false,
+                                "enableMultipleWriteLocations": false,
+                                "isVirtualNetworkFilterEnabled": false,
+                                "virtualNetworkRules": [
+                                ],
+                                "disableKeyBasedMetadataWriteAccess": false,
+                                "databaseAccountOfferType": "Standard",
+                                "consistencyPolicy": {
+                                    "defaultConsistencyLevel": "Session",
+                                    "maxIntervalInSeconds": 5,
+                                    "maxStalenessPrefix": 100
+                                },
+                                "locations": [
+                                    {
+                                        "locationName": "[resourceGroup().location]",
+                                        "provisioningState": "Succeeded",
+                                        "failoverPriority": 0,
+                                        "isZoneRedundant": false
+                                    }
+                                ],
+                                "capabilities": [
+                                ]
+                            }
+                        },
+                        {
+                            "type": "Microsoft.EventHub/namespaces",
+                            "apiVersion": "2018-01-01-preview",
+                            "name": "[variables('eventhub_name')]",
+                            "location": "[resourceGroup().location]",
+                            "sku": {
+                                "name": "Basic",
+                                "tier": "Basic",
+                                "capacity": 1
+                            },
+                            "properties": {
+                                "zoneRedundant": false,
+                                "isAutoInflateEnabled": false,
+                                "maximumThroughputUnits": 0,
+                                "kafkaEnabled": false
+                            }
+                        },
+                        {
+                            "type": "Microsoft.KeyVault/vaults",
+                            "apiVersion": "2016-10-01",
+                            "name": "[variables('keyvault_test_name')]",
+                            "location": "[resourceGroup().location]",
+                            "properties": {
+                                "sku": {
+                                    "family": "A",
+                                    "name": "Standard"
+                                },
+                                "tenantId": "[subscription().tenantId]",
+                                "accessPolicies": [
+                                    {
+                                        "tenantId": "[subscription().tenantId]",
+                                        "objectId": "[parameters('functionsTestAadAppObjectId')]",
+                                        "permissions": {
+                                            "keys": [
+                                                "Get",
+                                                "List",
+                                                "Update",
+                                                "Create",
+                                                "Import",
+                                                "Delete",
+                                                "Recover",
+                                                "Backup",
+                                                "Restore",
+                                                "Decrypt",
+                                                "Encrypt",
+                                                "UnwrapKey",
+                                                "WrapKey",
+                                                "Verify",
+                                                "Sign",
+                                                "Purge"
+                                            ],
+                                            "secrets": [
+                                                "Get",
+                                                "List",
+                                                "Set",
+                                                "Delete",
+                                                "Recover",
+                                                "Backup",
+                                                "Restore",
+                                                "Purge"
+                                            ],
+                                            "certificates": [
+                                                "Get",
+                                                "List",
+                                                "Update",
+                                                "Create",
+                                                "Import",
+                                                "Delete",
+                                                "Recover",
+                                                "Backup",
+                                                "Restore",
+                                                "ManageContacts",
+                                                "ManageIssuers",
+                                                "GetIssuers",
+                                                "ListIssuers",
+                                                "SetIssuers",
+                                                "DeleteIssuers",
+                                                "Purge"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "enabledForDeployment": false,
+                                "enabledForDiskEncryption": false,
+                                "enabledForTemplateDeployment": false
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Storage/storageAccounts",
+                            "apiVersion": "2019-04-01",
+                            "name": "[variables('storageAccount_name')]",
+                            "location": "[resourceGroup().location]",
+                            "sku": {
+                                "name": "Standard_RAGRS",
+                                "tier": "Standard"
+                            },
+                            "kind": "StorageV2",
+                            "properties": {
+                                "networkAcls": {
+                                    "bypass": "AzureServices",
+                                    "virtualNetworkRules": [
+                                    ],
+                                    "ipRules": [
+                                    ],
+                                    "defaultAction": "Allow"
+                                },
+                                "supportsHttpsTrafficOnly": true,
+                                "encryption": {
+                                    "services": {
+                                        "file": {
+                                            "enabled": true
+                                        },
+                                        "blob": {
+                                            "enabled": true
+                                        }
+                                    },
+                                    "keySource": "Microsoft.Storage"
+                                },
+                                "accessTier": "Hot"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+                            "apiVersion": "2019-08-01",
+                            "name": "[concat(variables('cosmos_name'), '/ItemDb')]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmos_name'))]"
+                            ],
+                            "properties": {
+                                "resource": {
+                                    "id": "ItemDb"
+                                },
+                                "options": {
+                                }
+                            }
+                        },
+                        {
+                            "type": "Microsoft.EventHub/namespaces/AuthorizationRules",
+                            "apiVersion": "2017-04-01",
+                            "name": "[concat(variables('eventhub_name'), '/RootManageSharedAccessKey')]",
+                            "location": "[resourceGroup().location]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.EventHub/namespaces', variables('eventhub_name'))]"
+                            ],
+                            "properties": {
+                                "rights": [
+                                    "Listen",
+                                    "Manage",
+                                    "Send"
+                                ]
+                            }
+                        },
+                        {
+                            "type": "Microsoft.EventHub/namespaces/eventhubs",
+                            "apiVersion": "2017-04-01",
+                            "name": "[concat(variables('eventhub_name'), '/testhub')]",
+                            "location": "[resourceGroup().location]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.EventHub/namespaces', variables('eventhub_name'))]"
+                            ],
+                            "properties": {
+                                "messageRetentionInDays": 1,
+                                "partitionCount": 2,
+                                "status": "Active"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Storage/storageAccounts/blobServices",
+                            "apiVersion": "2019-04-01",
+                            "name": "[concat(variables('storageAccount_name'), '/default')]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccount_name'))]"
+                            ],
+                            "sku": {
+                                "name": "Standard_RAGRS"
+                            },
+                            "properties": {
+                                "cors": {
+                                    "corsRules": [
+                                    ]
+                                },
+                                "deleteRetentionPolicy": {
+                                    "enabled": false
+                                }
+                            }
+                        },
+                        {
+                            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+                            "apiVersion": "2019-08-01",
+                            "name": "[concat(variables('cosmos_name'), '/ItemDb/ItemCollection')]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('cosmos_name'), 'ItemDb')]",
+                                "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmos_name'))]"
+                            ],
+                            "properties": {
+                                "resource": {
+                                    "id": "ItemCollection",
+                                    "indexingPolicy": {
+                                        "indexingMode": "consistent",
+                                        "automatic": true,
+                                        "includedPaths": [
+                                            {
+                                                "path": "/*",
+                                                "indexes": [
+                                                    {
+                                                        "kind": "Range",
+                                                        "dataType": "Number",
+                                                        "precision": -1
+                                                    },
+                                                    {
+                                                        "kind": "Range",
+                                                        "dataType": "String",
+                                                        "precision": -1
+                                                    }
+                                                ]
+                                            }
+                                        ],
+                                        "excludedPaths": [
+                                            {
+                                                "path": "/\"_etag\"/?"
+                                            }
+                                        ]
+                                    },
+                                    "conflictResolutionPolicy": {
+                                        "mode": "LastWriterWins",
+                                        "conflictResolutionPath": "/_ts"
+                                    }
+                                },
+                                "options": {
+                                }
+                            }
+                        },
+                        {
+                            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+                            "apiVersion": "2019-08-01",
+                            "name": "[concat(variables('cosmos_name'), '/ItemDb/leases')]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('cosmos_name'), 'ItemDb')]",
+                                "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmos_name'))]"
+                            ],
+                            "properties": {
+                                "resource": {
+                                    "id": "leases",
+                                    "indexingPolicy": {
+                                        "indexingMode": "consistent",
+                                        "automatic": true,
+                                        "includedPaths": [
+                                            {
+                                                "path": "/*",
+                                                "indexes": [
+                                                    {
+                                                        "kind": "Range",
+                                                        "dataType": "Number",
+                                                        "precision": -1
+                                                    },
+                                                    {
+                                                        "kind": "Range",
+                                                        "dataType": "String",
+                                                        "precision": -1
+                                                    }
+                                                ]
+                                            }
+                                        ],
+                                        "excludedPaths": [
+                                            {
+                                                "path": "/\"_etag\"/?"
+                                            }
+                                        ]
+                                    },
+                                    "conflictResolutionPolicy": {
+                                        "mode": "LastWriterWins",
+                                        "conflictResolutionPath": "/_ts"
+                                    }
+                                },
+                                "options": {
+                                }
+                            }
+                        },
+                        {
+                            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/throughputSettings",
+                            "apiVersion": "2019-08-01",
+                            "name": "[concat(variables('cosmos_name'), '/ItemDb/ItemCollection/default')]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers', variables('cosmos_name'), 'ItemDb', 'ItemCollection')]",
+                                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('cosmos_name'), 'ItemDb')]",
+                                "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmos_name'))]"
+                            ],
+                            "properties": {
+                                "resource": {
+                                    "throughput": 400
+                                }
+                            }
+                        },
+                        {
+                            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/throughputSettings",
+                            "apiVersion": "2019-08-01",
+                            "name": "[concat(variables('cosmos_name'), '/ItemDb/leases/default')]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers', variables('cosmos_name'), 'ItemDb', 'leases')]",
+                                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('cosmos_name'), 'ItemDb')]",
+                                "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmos_name'))]"
+                            ],
+                            "properties": {
+                                "resource": {
+                                    "throughput": 400
+                                }
+                            }
+                        },
+                        {
+                            "type": "Microsoft.KeyVault/vaults",
+                            "apiVersion": "2016-10-01",
+                            "name": "[variables('keyvault_name')]",
+                            "location": "[resourceGroup().location]",
+                            "properties": {
+                                "sku": {
+                                    "family": "A",
+                                    "name": "Standard"
+                                },
+                                "tenantId": "[subscription().tenantId]",
+                                "accessPolicies": [
+                                    {
+                                        "tenantId": "[subscription().tenantId]",
+                                        "objectId": "[parameters('azurePipelinesAadAppObjectId')]",
+                                        "permissions": {
+                                            "keys": [
+                                            ],
+                                            "secrets": [
+                                                "Get",
+                                                "List"
+                                            ],
+                                            "certificates": [
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "enabledForDeployment": false,
+                                "enabledForDiskEncryption": false,
+                                "enabledForTemplateDeployment": false
+                            }
+                        },
+                        {
+                            "type": "Microsoft.KeyVault/vaults/secrets",
+                            "name": "[concat(variables('keyvault_name'), '/KeyVaultName')]",
+                            "apiVersion": "2015-06-01",
+                            "properties": {
+                                "contentType": "text/plain",
+                                "value": "[variables('keyvault_test_name')]"
+                            },
+                            "dependsOn": [
+                                "[resourceId('Microsoft.KeyVault/vaults', variables('keyvault_name'))]"
+                            ]
+                        },
+                        {
+                            "type": "Microsoft.KeyVault/vaults/secrets",
+                            "name": "[concat(variables('keyvault_name'), '/Storage')]",
+                            "apiVersion": "2015-06-01",
+                            "properties": {
+                                "contentType": "text/plain",
+                                "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccount_name'), ';AccountKey=', listKeys(resourceid('Microsoft.Storage/storageAccounts', variables('storageAccount_name')), providers('Microsoft.Storage', 'storageAccounts').apiVersions[0]).keys[0].value, ';')]"
+                            },
+                            "dependsOn": [
+                                "[resourceId('Microsoft.KeyVault/vaults', variables('keyvault_name'))]",
+                                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccount_name'))]"
+                            ]
+                        },
+                        {
+                            "type": "Microsoft.KeyVault/vaults/secrets",
+                            "name": "[concat(variables('keyvault_name'), '/CosmosDb')]",
+                            "apiVersion": "2015-06-01",
+                            "properties": {
+                                "contentType": "text/plain",
+                                "value": "[listConnectionStrings(resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmos_name')), '2015-04-08').connectionStrings[0].connectionString]"
+                            },
+                            "dependsOn": [
+                                "[resourceId('Microsoft.KeyVault/vaults', variables('keyvault_name'))]",
+                                "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmos_name'))]"
+                            ]
+                        },
+                        {
+                            "type": "Microsoft.KeyVault/vaults/secrets",
+                            "name": "[concat(variables('keyvault_name'), '/EventHub')]",
+                            "apiVersion": "2015-06-01",
+                            "properties": {
+                                "contentType": "text/plain",
+                                "value": "[listKeys(resourceId('Microsoft.EventHub/namespaces/AuthorizationRules', variables('eventhub_name'), 'RootManageSharedAccessKey'), '2017-04-01').primaryConnectionString]"
+                            },
+                            "dependsOn": [
+                                "[resourceId('Microsoft.KeyVault/vaults', variables('keyvault_name'))]",
+                                "[resourceId('Microsoft.EventHub/namespaces', variables('eventhub_name'))]"
+                            ]
+                        },
+                        {
+                            "type": "Microsoft.KeyVault/vaults/secrets",
+                            "name": "[concat(variables('keyvault_name'), '/KeyVaultConnectionString')]",
+                            "apiVersion": "2015-06-01",
+                            "properties": {
+                                "contentType": "text/plain",
+                                "value": "[concat('RunAs=App;AppId=', parameters('functionsTestAadAppId'), ';TenantId=', subscription().tenantId, ';AppKey=', parameters('functionsTestAadAppClientSecret'))]"
+                            },
+                            "dependsOn": [
+                                "[resourceId('Microsoft.KeyVault/vaults', variables('keyvault_name'))]"
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
