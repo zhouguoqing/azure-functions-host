@@ -149,18 +149,22 @@ jobs:
       SourceFolder: '..\..\..\buildoutput'
       Contents: '*.nupkg'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    condition: and(succeeded(), or(and(ne(variables['Build.Reason'], 'PullRequest'), endswith( variables['Build.SourceBranch'], 'devops_experiment')), contains(variables['PullRequest.Title'], '[pack]')))
   - task: CopyFiles@2
     inputs:
       SourceFolder: '..\..\buildoutput'
       Contents: '*.nupkg'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    condition: and(succeeded(), or(and(ne(variables['Build.Reason'], 'PullRequest'), endswith( variables['Build.SourceBranch'], 'devops_experiment')), contains(variables['PullRequest.Title'], '[pack]')))
   - task: CopyFiles@2
     inputs:
       SourceFolder: '$(Build.Repository.LocalPath)\buildoutput'
       Contents: '*.zip'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    condition: and(succeeded(), or(and(ne(variables['Build.Reason'], 'PullRequest'), endswith( variables['Build.SourceBranch'], 'devops_experiment')), contains(variables['PullRequest.Title'], '[pack]')))
   - publish: $(Build.ArtifactStagingDirectory)
     artifact: artifacts
+    condition: and(succeeded(), or(and(ne(variables['Build.Reason'], 'PullRequest'), endswith( variables['Build.SourceBranch'], 'devops_experiment')), contains(variables['PullRequest.Title'], '[pack]')))
 
 - job: RunUnitTests
   pool:
