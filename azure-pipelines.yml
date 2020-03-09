@@ -67,6 +67,7 @@ jobs:
       failOnStderr: true
       filePath: '$(Build.Repository.LocalPath)\build.ps1'
       arguments: '-buildNumber "$(buildNumber)" -includeSuffix $(IncludeSuffix)'
+      pwsh: true
   - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@1
     displayName: 'ESRP CodeSigning: Strong Name and Authenticode'
     inputs:
