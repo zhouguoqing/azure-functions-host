@@ -7,13 +7,13 @@ pr:
   branches:
     include:
     - devops_experiment
-    - devops_experiment_pr
+    - devops_experiment_pr1
 
 trigger:
   branches:
     include:
     - devops_experiment
-    - devops_experiment_pr
+    - devops_experiment_pr1
 
 jobs:
 - job: InitializePipeline
@@ -51,9 +51,8 @@ jobs:
   dependsOn: InitializePipeline
   condition: succeeded()
   variables:
-    includeSuffix: $true
     ${{ if endswith( variables['Build.SourceBranch'], 'devops_experiment' )  }}:
-      includeSuffix: $false
+        variables['IncludeSuffix']: $false
   pool:
     vmImage: 'vs2017-win2016' 
   steps:
@@ -66,7 +65,7 @@ jobs:
     displayName: "Build artifacts"
     inputs:
       filePath: '$(Build.Repository.LocalPath)\build.ps1'
-      arguments: '-buildNumber "$(buildNumber)" -includeSuffix $(includeSuffix)'
+      arguments: '-buildNumber "$(buildNumber)" -includeSuffix $(IncludeSuffix)'
   - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@1
     displayName: 'ESRP CodeSigning: Strong Name and Authenticode'
     inputs:
