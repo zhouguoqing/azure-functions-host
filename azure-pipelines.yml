@@ -7,11 +7,13 @@ pr:
   branches:
     include:
     - devops_experiment
+    - devops_experiment_pr
 
 trigger:
   branches:
     include:
     - devops_experiment
+    - devops_experiment_pr
 
 jobs:
 - job: InitializePipeline
