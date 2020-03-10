@@ -1,5 +1,7 @@
 $buildReason = $env:BUILD_REASON
+$title = "N/A"
 Write-Host "Build reason: $buildReason"
+"##vso[task.setvariable variable=PullRequestTitle]$title"
 
 if ($buildReason -eq "PullRequest") {
   # parse PR title to see if we should pack this
