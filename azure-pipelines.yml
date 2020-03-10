@@ -65,8 +65,6 @@ jobs:
       script: |
         $sourceBranch = $env:BUILD_SOURCEBRANCH
         $buildReason = $env:BUILD_REASON
-        $title = "N/A"
-        "##vso[task.setvariable variable=PullRequestTitle]$title"
         Write-Host "SourceBranch: $sourceBranch, Build reason: $buildReason"
         if($sourceBranch.endsWith('devops_experiment') -and ($buildReason -ne "PullRequest"))
         {
@@ -88,7 +86,7 @@ jobs:
     inputs:
       failOnStderr: true
       filePath: '$(Build.Repository.LocalPath)\build.ps1'
-      arguments: '-buildNumber "$(buildNumber)" -includeSuffix $(IncludeSuffix)'
+      arguments: '-buildNumber "$(buildNumber)" -includeSuffix $(IncludeSuffix) -devopsPRTitle $(PullRequestTitle)'
       pwsh: true
   - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@1
     displayName: 'ESRP CodeSigning: Strong Name and Authenticode'
