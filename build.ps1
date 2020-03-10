@@ -1,7 +1,8 @@
 ﻿param (
   [string]$buildNumber = "0",
   [string]$extensionVersion = "2.0.$buildNumber",
-  [bool]$includeSuffix = $true
+  [bool]$includeSuffix = $true,
+  [string]$devopsPRTitle = ""
 )
 
 if ($includeSuffix)
@@ -17,6 +18,7 @@ Write-Host "PR Title: $prTitle"
 Write-Host "PR number: $prNumber"
 Write-Host "IncludeSuffix: $includeSuffix"
 Write-Host "SourceBranch: $sourceBranch"
+Write-Host "DevopsTitle: $devopsPRTitle"
 
 $currentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $buildOutput = Join-Path $currentDir "buildoutput"
@@ -300,7 +302,6 @@ $cmd = "pack", "tools\ExtensionsMetadataGenerator\src\ExtensionsMetadataGenerato
 & dotnet $cmd
 
 $appveyorPRTitle = $env:APPVEYOR_PULL_REQUEST_TITLE
-$devopsPRTitle = $(PullRequestTitle)
 $buildReason = $env:BUILD_REASON
 
 $isPullRequest = $appveyorPRNumber -or ($buildReason -and ($buildReason -eq "PullRequest"))
