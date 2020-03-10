@@ -59,7 +59,7 @@ jobs:
       version: '2.2.x'
       performMultiLevelLookup: true
   - task: PowerShell@2
-    displayName: "Determine suffix"
+    displayName: "Determine suffix and populate PR title"
     inputs:
       targetType: 'inline'
       script: |
