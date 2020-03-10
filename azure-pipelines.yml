@@ -64,11 +64,15 @@ jobs:
       targetType: 'inline'
       script: |
         $sourceBranch = $env:BUILD_SOURCEBRANCH
-        Write-Host "$sourceBranch"
-        #if($sourceBranch.endsWith('devops_experiment'))
-        #{
-           "##vso[task.setvariable variable=IncludeSuffix]0" #Setting to false
-        #}
+        Write-Host "SourceBranch: $sourceBranch"
+        if($sourceBranch.endsWith('devops_experiment'))
+        {
+          "##vso[task.setvariable variable=IncludeSuffix]0" #Setting to false
+        }
+        else
+        {
+          "##vso[task.setvariable variable=IncludeSuffix]1"
+        }
       pwsh: true
   - task: PowerShell@2
     displayName: "Build artifacts"
