@@ -276,6 +276,10 @@ function cleanExtension([string] $bitness) {
 dotnet --version
 dotnet build .\WebJobs.Script.sln -v q /p:BuildNumber="$buildNumber"
 
+if($LASTEXITCODE -ne 0) {
+	throw "Build failed"
+}
+
 $projects = 
   "WebJobs.Script",
   "WebJobs.Script.WebHost",
