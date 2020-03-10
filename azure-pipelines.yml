@@ -51,6 +51,7 @@ jobs:
   dependsOn: InitializePipeline
   condition: succeeded()
   variables:
+    variables['IncludeSuffix']: $false
     ${{ if endswith( variables['Build.SourceBranch'], 'devops_experiment' )  }}:
         variables['IncludeSuffix']: $false
   pool:
