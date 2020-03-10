@@ -11,7 +11,7 @@ if ($includeSuffix)
 $buildArtifacts = $env:BuildArtifacts
 $prNumber = $env:SYSTEM_PULLREQUEST_PULLREQUESTNUMBER
 $sourceBranch = $env:BUILD_SOURCEBRANCH
-$prTitle = $env:PULLREQUEST_TITLE 
+$prTitle = $(PullRequestTitle) 
 Write-Host "Reason: $buildReason"
 Write-Host "PR Title: $prTitle"
 Write-Host "PR number: $prNumber"
@@ -300,7 +300,7 @@ $cmd = "pack", "tools\ExtensionsMetadataGenerator\src\ExtensionsMetadataGenerato
 & dotnet $cmd
 
 $appveyorPRTitle = $env:APPVEYOR_PULL_REQUEST_TITLE
-$devopsPRTitle = $env:PULLREQUEST_TITLE
+$devopsPRTitle = $(PullRequestTitle)
 $buildReason = $env:BUILD_REASON
 
 $isPullRequest = $appveyorPRNumber -or ($buildReason -and ($buildReason -eq "PullRequest"))
