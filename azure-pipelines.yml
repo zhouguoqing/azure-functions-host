@@ -64,14 +64,23 @@ jobs:
       targetType: 'inline'
       script: |
         $sourceBranch = $env:BUILD_SOURCEBRANCH
-        Write-Host "SourceBranch: $sourceBranch"
-        if($sourceBranch.endsWith('devops_experiment'))
+        $buildReason = $env:BUILD_REASON
+        $title = "N/A"
+        "##vso[task.setvariable variable=PullRequestTitle]$title"
+        Write-Host "SourceBranch: $sourceBranch, Build reason: $buildReason"
+        if($sourceBranch.endsWith('devops_experiment') -and ($buildReason -ne "PullRequest"))
         {
           "##vso[task.setvariable variable=IncludeSuffix]0" #Setting to false
         }
         else
         {
           "##vso[task.setvariable variable=IncludeSuffix]1"
+          if($buildReason -eq "PullRequest")
+          {
+            $response = Invoke-RestMethod api.github.com/repos/$env:BUILD_REPOSITORY_ID/pulls/$env:SYSTEM_PULLREQUEST_PULLREQUESTNUMBER
+            $title = $response.title.ToLowerInvariant()
+            "##vso[task.setvariable variable=PullRequestTitle]$title"
+          }
         }
       pwsh: true
   - task: PowerShell@2
