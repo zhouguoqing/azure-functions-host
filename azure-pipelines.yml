@@ -64,9 +64,10 @@ jobs:
       targetType: 'inline'
       script: |
         $sourceBranch = $env:BUILD_SOURCEBRANCH
+        Write-Host "$sourceBranch"
         #if($sourceBranch.endsWith('devops_experiment'))
         #{
-           $env:IncludeSuffix = $false
+           $(IncludeSuffix) = $false
         #}
       pwsh: true
   - task: PowerShell@2
@@ -74,7 +75,7 @@ jobs:
     inputs:
       failOnStderr: true
       filePath: '$(Build.Repository.LocalPath)\build.ps1'
-      arguments: '-buildNumber "$(buildNumber)" -includeSuffix "$(IncludeSuffix)"'
+      arguments: '-buildNumber "$(buildNumber)" -includeSuffix $(IncludeSuffix)'
       pwsh: true
   - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@1
     displayName: 'ESRP CodeSigning: Strong Name and Authenticode'
