@@ -1,4 +1,5 @@
 $buildReason = $env:BUILD_REASON
+Write-Host "Build reason: $buildReason"
 
 if ($buildReason -eq "PullRequest") {
   # parse PR title to see if we should pack this
