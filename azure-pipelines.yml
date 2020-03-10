@@ -65,6 +65,7 @@ jobs:
       script: |
         $sourceBranch = $env:BUILD_SOURCEBRANCH
         $buildReason = $env:BUILD_REASON
+        $title = ""
         Write-Host "SourceBranch: $sourceBranch, Build reason: $buildReason"
         if($sourceBranch.endsWith('devops_experiment') -and ($buildReason -ne "PullRequest"))
         {
@@ -77,9 +78,9 @@ jobs:
           {
             $response = Invoke-RestMethod api.github.com/repos/$env:BUILD_REPOSITORY_ID/pulls/$env:SYSTEM_PULLREQUEST_PULLREQUESTNUMBER
             $title = $response.title.ToLowerInvariant()
-            "##vso[task.setvariable variable=PullRequestTitle]$title"
           }
         }
+        "##vso[task.setvariable variable=PullRequestTitle]$title"
       pwsh: true
   - task: PowerShell@2
     displayName: "Build artifacts"
