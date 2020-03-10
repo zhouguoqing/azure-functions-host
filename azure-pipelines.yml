@@ -50,10 +50,6 @@ jobs:
 - job: BuildArtifacts_Windows
   dependsOn: InitializePipeline
   condition: succeeded()
-  variables:
-    ${{ if endswith( variables['Build.SourceBranch'], 'devops_experiment' )  }}:
-        IncludeSuffixTemp: $false
-    IncludeSuffix: variables['IncludeSuffixTemp']
   pool:
     vmImage: 'vs2017-win2016' 
   steps:
@@ -63,11 +59,22 @@ jobs:
       version: '2.2.x'
       performMultiLevelLookup: true
   - task: PowerShell@2
+    displayName: "Determine suffix"
+    inputs:
+      targetType: 'inline'
+      script: |
+        $sourceBranch = $env:BUILD_SOURCEBRANCH
+        #if($sourceBranch.endsWith('devops_experiment'))
+        #{
+           $env:IncludeSuffix = $false
+        #}
+      pwsh: true
+  - task: PowerShell@2
     displayName: "Build artifacts"
     inputs:
       failOnStderr: true
       filePath: '$(Build.Repository.LocalPath)\build.ps1'
-      arguments: '-buildNumber "$(buildNumber)" -includeSuffix "$(If([string]::IsNullOrEmpty($(IncludeSuffix))) {$true} Else {$false}))"'
+      arguments: '-buildNumber "$(buildNumber)" -includeSuffix "$(IncludeSuffix)"'
       pwsh: true
   - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@1
     displayName: 'ESRP CodeSigning: Strong Name and Authenticode'
