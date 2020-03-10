@@ -12,9 +12,8 @@ if ($includeSuffix)
 $buildArtifacts = $env:BuildArtifacts
 $prNumber = $env:SYSTEM_PULLREQUEST_PULLREQUESTNUMBER
 $sourceBranch = $env:BUILD_SOURCEBRANCH
-$prTitle = $(PullRequestTitle) 
 Write-Host "Reason: $buildReason"
-Write-Host "PR Title: $prTitle"
+Write-Host "PR Title: $devopsPRTitle"
 Write-Host "PR number: $prNumber"
 Write-Host "IncludeSuffix: $includeSuffix"
 Write-Host "SourceBranch: $sourceBranch"
