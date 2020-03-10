@@ -67,7 +67,7 @@ jobs:
         Write-Host "$sourceBranch"
         #if($sourceBranch.endsWith('devops_experiment'))
         #{
-           "##vso[task.setvariable variable=IncludeSuffix]$$false"
+           "##vso[task.setvariable variable=IncludeSuffix]0" $Setting to false
         #}
       pwsh: true
   - task: PowerShell@2
