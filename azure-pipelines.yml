@@ -410,6 +410,7 @@ jobs:
     condition: succeededOrFailed()
     inputs:
       command: 'test'
+      workingDirectory: '/usr/bin/'
       testRunTitle: "Linux container end to end tests Windows"
       arguments: '--filter "Group=ContainerInstanceTests"'
       projects: |
