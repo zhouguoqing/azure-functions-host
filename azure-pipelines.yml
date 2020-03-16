@@ -31,7 +31,6 @@ jobs:
     name: Initialize
     inputs:
       filePath: '$(Build.Repository.LocalPath)\build\initialize-pipeline.ps1'
-      arguments: '-connectionString ''$(Storage-azurefunctionshostci0)'''
 
 - job: BuildArtifacts_Ubuntu
   pool:
@@ -50,6 +49,9 @@ jobs:
 - job: BuildArtifacts_Windows
   dependsOn: InitializePipeline
   condition: succeeded()
+  variables:
+    bypassPackaging: dependencies.InitializePipeline.outputs['Initialize.BypassPackaging']
+    includeSuffix: dependencies.InitializePipeline.outputs['Initialize.IncludeSuffix']
   pool:
     vmImage: 'vs2017-win2016' 
   steps:
@@ -59,34 +61,10 @@ jobs:
       version: '2.2.x'
       performMultiLevelLookup: true
   - task: PowerShell@2
-    displayName: "Determine suffix and populate PR title"
-    inputs:
-      targetType: 'inline'
-      script: |
-        $sourceBranch = $env:BUILD_SOURCEBRANCH
-        $buildReason = $env:BUILD_REASON
-        $title = ""
-        Write-Host "SourceBranch: $sourceBranch, Build reason: $buildReason"
-        if($sourceBranch.endsWith('devops_experiment') -and ($buildReason -ne "PullRequest"))
-        {
-          "##vso[task.setvariable variable=IncludeSuffix]0" #Setting to false
-        }
-        else
-        {
-          "##vso[task.setvariable variable=IncludeSuffix]1"
-          if($buildReason -eq "PullRequest")
-          {
-            $response = Invoke-RestMethod api.github.com/repos/$env:BUILD_REPOSITORY_ID/pulls/$env:SYSTEM_PULLREQUEST_PULLREQUESTNUMBER
-            $title = $response.title.ToLowerInvariant()
-          }
-        }
-        "##vso[task.setvariable variable=PullRequestTitle]$title"
-      pwsh: true
-  - task: PowerShell@2
     displayName: "Build artifacts"
     inputs:
       filePath: '$(Build.Repository.LocalPath)\build.ps1'
-      arguments: '-buildNumber "$(buildNumber)" -includeSuffix $(IncludeSuffix) -devopsPRTitle "$(PullRequestTitle)"'
+      arguments: '-buildNumber "$(buildNumber)" -includeSuffix $(includeSuffix) -bypassPackaging $(bypassPackaging) -signOutput $false'
   - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@1
     displayName: 'ESRP CodeSigning: Strong Name and Authenticode'
     inputs:
@@ -131,7 +109,7 @@ jobs:
             "ToolVersion": "1.0"
           }
         ]
-    condition: and(succeeded(), or(and(ne(variables['Build.Reason'], 'PullRequest'), endswith( variables['Build.SourceBranch'], 'devops_experiment')), contains(variables['PullRequestTitle'], '[pack]')))
+    condition: and(succeeded(), eq(dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'], false))
   - task: DeleteFiles@1
     displayName: 'Delete CodeSignSummary files'
     inputs:
@@ -160,7 +138,7 @@ jobs:
              "ToolVersion": "1.0"
            }
        ]
-    condition: and(succeeded(), or(and(ne(variables['Build.Reason'], 'PullRequest'), endswith( variables['Build.SourceBranch'], 'devops_experiment')), contains(variables['PullRequestTitle'], '[pack]')))
+    condition: and(succeeded(), eq(dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'], false))
   - task: DeleteFiles@1
     displayName: 'Delete CodeSignSummary files'
     inputs:
@@ -170,22 +148,22 @@ jobs:
       SourceFolder: '..\..\..\buildoutput'
       Contents: '*.nupkg'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
-    condition: and(succeeded(), or(and(ne(variables['Build.Reason'], 'PullRequest'), endswith( variables['Build.SourceBranch'], 'devops_experiment')), contains(variables['PullRequestTitle'], '[pack]')))
+    condition: and(succeeded(), eq(dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'], false))
   - task: CopyFiles@2
     inputs:
       SourceFolder: '..\..\buildoutput'
       Contents: '*.nupkg'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
-    condition: and(succeeded(), or(and(ne(variables['Build.Reason'], 'PullRequest'), endswith( variables['Build.SourceBranch'], 'devops_experiment')), contains(variables['PullRequestTitle'], '[pack]')))
+    condition: and(succeeded(), eq(dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'], false))
   - task: CopyFiles@2
     inputs:
       SourceFolder: '$(Build.Repository.LocalPath)\buildoutput'
       Contents: '*.zip'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
-    condition: and(succeeded(), or(and(ne(variables['Build.Reason'], 'PullRequest'), endswith( variables['Build.SourceBranch'], 'devops_experiment')), contains(variables['PullRequestTitle'], '[pack]')))
+    condition: and(succeeded(), eq(dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'], false))
   - publish: $(Build.ArtifactStagingDirectory)
     artifact: artifacts
-    condition: and(succeeded(), or(and(ne(variables['Build.Reason'], 'PullRequest'), endswith( variables['Build.SourceBranch'], 'devops_experiment')), contains(variables['PullRequestTitle'], '[pack]')))
+    condition: and(succeeded(), eq(dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'], false))
 
 - job: RunUnitTests
   pool:
@@ -410,7 +388,6 @@ jobs:
     condition: succeededOrFailed()
     inputs:
       command: 'test'
-      workingDirectory: '/usr/bin/'
       testRunTitle: "Linux container end to end tests Windows"
       arguments: '--filter "Group=ContainerInstanceTests"'
       projects: |
