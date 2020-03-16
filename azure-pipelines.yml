@@ -109,7 +109,7 @@ jobs:
             "ToolVersion": "1.0"
           }
         ]
-    condition: and(succeeded(), eq(dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'], false))
+    condition: and(succeeded(), eq($(bypassPackaging), false))
   - task: DeleteFiles@1
     displayName: 'Delete CodeSignSummary files'
     inputs:
@@ -138,7 +138,7 @@ jobs:
              "ToolVersion": "1.0"
            }
        ]
-    condition: and(succeeded(), eq(dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'], false))
+    condition: and(succeeded(), eq($(bypassPackaging), false))
   - task: DeleteFiles@1
     displayName: 'Delete CodeSignSummary files'
     inputs:
@@ -148,22 +148,22 @@ jobs:
       SourceFolder: '..\..\..\buildoutput'
       Contents: '*.nupkg'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
-    condition: and(succeeded(), eq(dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'], false))
+    condition: and(succeeded(), eq($(bypassPackaging), false))
   - task: CopyFiles@2
     inputs:
       SourceFolder: '..\..\buildoutput'
       Contents: '*.nupkg'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
-    condition: and(succeeded(), eq(dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'], false))
+    condition: and(succeeded(), eq($(bypassPackaging), false))
   - task: CopyFiles@2
     inputs:
       SourceFolder: '$(Build.Repository.LocalPath)\buildoutput'
       Contents: '*.zip'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
-    condition: and(succeeded(), eq(dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'], false))
+    condition: and(succeeded(), eq($(bypassPackaging), false))
   - publish: $(Build.ArtifactStagingDirectory)
     artifact: artifacts
-    condition: and(succeeded(), eq(dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'], false))
+    condition: and(succeeded(), eq($(bypassPackaging), false))
 
 - job: RunUnitTests
   pool:
