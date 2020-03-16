@@ -50,8 +50,8 @@ jobs:
   dependsOn: InitializePipeline
   condition: succeeded()
   variables:
-    bypassPackaging: dependencies.InitializePipeline.outputs['Initialize.BypassPackaging']
-    includeSuffix: dependencies.InitializePipeline.outputs['Initialize.IncludeSuffix']
+    bypassPackaging: ${{dependencies.InitializePipeline.outputs['Initialize.BypassPackaging']}}
+    includeSuffix: ${{dependencies.InitializePipeline.outputs['Initialize.IncludeSuffix']}}
   pool:
     vmImage: 'vs2017-win2016' 
   steps:
@@ -64,7 +64,7 @@ jobs:
     displayName: "Build artifacts"
     inputs:
       filePath: '$(Build.Repository.LocalPath)\build.ps1'
-      arguments: '-buildNumber "$(buildNumber)" -includeSuffix ([int]$(includeSuffix)) -bypassPackaging ([int]$(bypassPackaging)) -signOutput $false'
+      arguments: '-buildNumber "$(buildNumber)" -includeSuffix $(includeSuffix) -bypassPackaging $(bypassPackaging) -signOutput $false'
   - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@1
     displayName: 'ESRP CodeSigning: Strong Name and Authenticode'
     inputs:
@@ -109,7 +109,7 @@ jobs:
             "ToolVersion": "1.0"
           }
         ]
-    condition: and(succeeded(), eq(variables['bypassPackaging'], false))
+    condition: and(succeeded(), eq(variables['bypassPackaging'], 0))
   - task: DeleteFiles@1
     displayName: 'Delete CodeSignSummary files'
     inputs:
@@ -138,7 +138,7 @@ jobs:
              "ToolVersion": "1.0"
            }
        ]
-    condition: and(succeeded(), eq(variables['bypassPackaging'], false))
+    condition: and(succeeded(), eq(variables['bypassPackaging'], 0))
   - task: DeleteFiles@1
     displayName: 'Delete CodeSignSummary files'
     inputs:
@@ -148,22 +148,22 @@ jobs:
       SourceFolder: '..\..\..\buildoutput'
       Contents: '*.nupkg'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
-    condition: and(succeeded(), eq(variables['bypassPackaging'], false))
+    condition: and(succeeded(), eq(variables['bypassPackaging'], 0))
   - task: CopyFiles@2
     inputs:
       SourceFolder: '..\..\buildoutput'
       Contents: '*.nupkg'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
-    condition: and(succeeded(), eq(variables['bypassPackaging'], false))
+    condition: and(succeeded(), eq(variables['bypassPackaging'], 0))
   - task: CopyFiles@2
     inputs:
       SourceFolder: '$(Build.Repository.LocalPath)\buildoutput'
       Contents: '*.zip'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
-    condition: and(succeeded(), eq(variables['bypassPackaging'], false))
+    condition: and(succeeded(), eq(variables['bypassPackaging'], 0))
   - publish: $(Build.ArtifactStagingDirectory)
     artifact: artifacts
-    condition: and(succeeded(), eq(variables['bypassPackaging'], false))
+    condition: and(succeeded(), eq(variables['bypassPackaging'], 0))
 
 - job: RunUnitTests
   pool:
