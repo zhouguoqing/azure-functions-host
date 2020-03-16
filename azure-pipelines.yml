@@ -50,8 +50,8 @@ jobs:
   dependsOn: InitializePipeline
   condition: succeeded()
   variables:
-    bypassPackaging: ${{dependencies.InitializePipeline.outputs['Initialize.BypassPackaging']}}
-    includeSuffix: ${{dependencies.InitializePipeline.outputs['Initialize.IncludeSuffix']}}
+    bypassPackaging: ${{ dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'] }}
+    includeSuffix: ${{ dependencies.InitializePipeline.outputs['Initialize.IncludeSuffix'] }}
   pool:
     vmImage: 'vs2017-win2016' 
   steps:
