@@ -1,12 +1,12 @@
 param (
   [string]$buildNumber = "0",
   [string]$extensionVersion = "2.0.$buildNumber",
-  [string]$includeSuffix = "true",
-  [string]$bypassPackaging = "true",
-  [string]$signOutput = "true"
+  [bool]$includeSuffix = $true,
+  [bool]$bypassPackaging = $true,
+  [bool]$signOutput = $true
 )
 
-if ([boolean] $includeSuffix)
+if ($includeSuffix)
 {
     $extensionVersion += "-prerelease"
 }
@@ -296,7 +296,7 @@ $cmd = "pack", "tools\WebJobs.Script.Performance\WebJobs.Script.Performance.App\
 $cmd = "pack", "tools\ExtensionsMetadataGenerator\src\ExtensionsMetadataGenerator\ExtensionsMetadataGenerator.csproj", "-o", "..\..\..\..\buildoutput", "-c", "Release"
 & dotnet $cmd
 
-if ([boolean] $bypassPackaging){
+if ($bypassPackaging){
     Write-Host "Bypassing artifact packaging and CrossGen for pull request." -ForegroundColor Yellow
 } else {
     AddDiaSymReaderToPath
@@ -307,7 +307,7 @@ if ([boolean] $bypassPackaging){
     #build win-x86 and win-x64 extension
     BuildPackages 0
 
-    if([boolean] $signOutput) {
+    if($signOutput) {
         & ".\tools\RunSigningJob.ps1" 
 	}
     if (-not $?) { exit 1 }
