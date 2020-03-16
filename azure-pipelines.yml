@@ -64,7 +64,7 @@ jobs:
     displayName: "Build artifacts"
     inputs:
       filePath: '$(Build.Repository.LocalPath)\build.ps1'
-      arguments: '-buildNumber "$(buildNumber)" -includeSuffix ([boolean] "$(includeSuffix)") -bypassPackaging ([boolean] "$(bypassPackaging)") -signOutput $false'
+      arguments: '-buildNumber "$(buildNumber)" -includeSuffix ([System.Convert]::ToBoolean("$(includeSuffix)")) -bypassPackaging ([System.Convert]::ToBoolean("$(bypassPackaging)")) -signOutput $false'
   - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@1
     displayName: 'ESRP CodeSigning: Strong Name and Authenticode'
     inputs:
