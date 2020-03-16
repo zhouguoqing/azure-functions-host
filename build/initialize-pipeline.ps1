@@ -4,7 +4,7 @@ $bypassPackaging = $true
 $includeSuffix = 1
 Write-Host "SourceBranch: $sourceBranch, Build reason: $buildReason"
 
-if($sourceBranch.endsWith('master') -and ($buildReason -ne "PullRequest"))
+if($sourceBranch.endsWith('devops_experiment') -and ($buildReason -ne "PullRequest"))
 {
   $includeSuffix = 0 #Setting to false
   $bypassPackaging = $false
