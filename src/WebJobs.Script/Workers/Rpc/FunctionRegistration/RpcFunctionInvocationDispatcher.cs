@@ -434,5 +434,15 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
                 await DisposeAndRestartWorkerChannel(_workerRuntime, channel.Id);
             }
         }
+
+        public async Task PingAsync()
+        {
+            /*IEnumerable<IRpcWorkerChannel> channels = await GetInitializedWorkerChannelsAsync();
+            await Task.WhenAll(channels.Select(a => a.PingAsync()));*/
+
+            IEnumerable<IRpcWorkerChannel> workerChannels = await GetInitializedWorkerChannelsAsync();
+            var rpcWorkerChannel = _functionDispatcherLoadBalancer.GetLanguageWorkerChannel(workerChannels, _maxProcessCount);
+            await rpcWorkerChannel.PingAsync();
+        }
     }
 }

@@ -24,5 +24,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers
         Task<bool> RestartWorkerWithInvocationIdAsync(string invocationId);
 
         Task RestartAllWorkersAsync();
+
+        Task PingAsync();
     }
 }

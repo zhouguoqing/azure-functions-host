@@ -130,5 +130,10 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Workers.Rpc
         {
             return _executingInvocations.Contains(invocationId);
         }
+
+        public Task PingAsync()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

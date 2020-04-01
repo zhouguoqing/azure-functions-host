@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,9 +25,11 @@ using Microsoft.Azure.WebJobs.Script.WebHost.Management;
 using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authorization;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authorization.Policies;
+using Microsoft.Azure.WebJobs.Script.Workers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Net.Http.Headers;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using HttpHandler = Microsoft.Azure.WebJobs.IAsyncConverter<System.Net.Http.HttpRequestMessage, System.Net.Http.HttpResponseMessage>;
@@ -114,8 +117,17 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
         [HttpPost]
         [Route("admin/host/ping")]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-        public IActionResult Ping([FromServices] IScriptHostManager scriptHostManager)
+        public async Task<IActionResult> Ping([FromServices] IScriptHostManager scriptHostManager, [FromServices] IFunctionInvocationDispatcherFactory functionInvocationDispatcherFactory)
         {
+            if (Request.Headers.TryGetValue(HeaderNames.UserAgent, out var userAgent) && userAgent.Contains("HttpScaleManager"))
+            {
+                IFunctionInvocationDispatcher functionInvocationDispatcher = functionInvocationDispatcherFactory.GetFunctionDispatcher();
+                if (functionInvocationDispatcher.State.Equals(FunctionInvocationDispatcherState.Initialized))
+                {
+                    await functionInvocationDispatcher.PingAsync();
+                }
+            }
+
             var pingStatus = new JObject
             {
                 { "hostState", scriptHostManager.State.ToString() }

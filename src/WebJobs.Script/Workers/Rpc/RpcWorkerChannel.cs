@@ -55,6 +55,9 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         private TaskCompletionSource<bool> _reloadTask = new TaskCompletionSource<bool>();
         private TaskCompletionSource<bool> _workerInitTask = new TaskCompletionSource<bool>();
 
+        // prototyping
+        private TaskCompletionSource<bool> _workerPingTask;
+
         internal RpcWorkerChannel(
            string workerId,
            IScriptEventManager eventManager,
@@ -143,6 +146,11 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
                     HostVersion = ScriptHost.Version
                 }
             });
+        }
+
+        internal void ReceiveWorkerPingResponse(RpcEvent responseEvent)
+        {
+            _workerPingTask.SetResult(true);
         }
 
         internal void FunctionEnvironmentReloadResponse(FunctionEnvironmentReloadResponse res, IDisposable latencyEvent)
@@ -504,6 +512,23 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         public bool IsExecutingInvocation(string invocationId)
         {
             return _executingInvocations.ContainsKey(invocationId);
+        }
+
+        public async Task PingAsync()
+        {
+            _workerPingTask = new TaskCompletionSource<bool>();
+            _inboundWorkerEvents.Where(msg => msg.MessageType == MsgType.WorkerStatusResponse)
+               .Timeout(workerInitTimeout)
+               .Take(1)
+               .Subscribe(ReceiveWorkerPingResponse);
+
+            SendStreamingMessage(new StreamingMessage
+            {
+                WorkerStatusRequest = new WorkerStatusRequest()
+                {
+                }
+            });
+            await _workerPingTask.Task;
         }
     }
 }
