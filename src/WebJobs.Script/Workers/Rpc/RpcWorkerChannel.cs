@@ -56,7 +56,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         private TaskCompletionSource<bool> _workerInitTask = new TaskCompletionSource<bool>();
 
         // prototyping
-        private TaskCompletionSource<bool> _workerPingTask;
+        private ConcurrentDictionary<string, TaskCompletionSource<bool>> _workerPingTask = new ConcurrentDictionary<string, TaskCompletionSource<bool>>();
 
         internal RpcWorkerChannel(
            string workerId,
@@ -146,11 +146,6 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
                     HostVersion = ScriptHost.Version
                 }
             });
-        }
-
-        internal void ReceiveWorkerPingResponse(RpcEvent responseEvent)
-        {
-            _workerPingTask.SetResult(true);
         }
 
         internal void FunctionEnvironmentReloadResponse(FunctionEnvironmentReloadResponse res, IDisposable latencyEvent)
@@ -516,19 +511,34 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
 
         public async Task PingAsync()
         {
-            _workerPingTask = new TaskCompletionSource<bool>();
+            var pingTask = new TaskCompletionSource<bool>();
             _inboundWorkerEvents.Where(msg => msg.MessageType == MsgType.WorkerStatusResponse)
                .Timeout(workerInitTimeout)
                .Take(1)
-               .Subscribe(ReceiveWorkerPingResponse);
+               .Subscribe((msg) => ReceiveWorkerPingResponse(msg.Message.RequestId, msg.Message.WorkerStatusResponse));
 
-            SendStreamingMessage(new StreamingMessage
+            var requestId = Guid.NewGuid().ToString();
+            var request = new StreamingMessage
             {
+                RequestId = requestId,
                 WorkerStatusRequest = new WorkerStatusRequest()
                 {
                 }
-            });
-            await _workerPingTask.Task;
+            };
+
+            if (_workerPingTask.TryAdd(request.RequestId, pingTask))
+            {
+                SendStreamingMessage(request);
+                await pingTask.Task;
+            }
+        }
+
+        internal void ReceiveWorkerPingResponse(string requestId, WorkerStatusResponse responseEvent)
+        {
+            if (_workerPingTask.TryRemove(requestId, out var pingTask))
+            {
+                pingTask.SetResult(true);
+            }
         }
     }
 }
