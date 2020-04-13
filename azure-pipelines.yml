@@ -188,9 +188,9 @@ jobs:
   - publish: $(Build.Repository.LocalPath)\packages\Microsoft.Azure.WebJobs.Script.3.0.$(buildNumber)${{ variables.artifactSuffix }}.nupkg
     artifact: Microsoft.Azure.WebJobs.Script.3.0.$(buildNumber)${{ variables.artifactSuffix }}
   - publish: $(Build.Repository.LocalPath)\packages\ExtensionsMetadataGenerator
-    artifact: ExtensionsMetadataGenerator
+    artifact: ExtensionsMetadataGenerator${{ variables.artifactSuffix }}
   - publish: $(Build.Repository.LocalPath)\packages\WebJobs.Script.Performance.App
-    artifact: WebJobs.Script.Performance.App
+    artifact: WebJobs.Script.Performance.App${{ variables.artifactSuffix }}
   - publish: $(Build.Repository.LocalPath)\packages\Microsoft.Azure.WebJobs.Script.Grpc.3.0.$(buildNumber)${{ variables.artifactSuffix }}.nupkg
     artifact: Microsoft.Azure.WebJobs.Script.Grpc.3.0.$(buildNumber)${{ variables.artifactSuffix }}.nupkg
   - publish: $(Build.Repository.LocalPath)\packages\Microsoft.Azure.WebJobs.Script.WebHost.3.0.$(buildNumber)${{ variables.artifactSuffix }}.nupkg
