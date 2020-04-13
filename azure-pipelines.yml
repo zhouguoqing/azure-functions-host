@@ -39,11 +39,11 @@ jobs:
   dependsOn: InitializePipeline
   # condition: and(succeeded(), or(ne(variables['Build.Reason'], 'PullRequest'), eq(dependencies.InitializePipeline.outputs['Initialize.BuildArtifacts'], true)))
   variables:
-    ${{ if or( eq( variables['Build.Reason'], 'PullRequest' ), not( endswith( variables['Build.SourceBranch'], 'release/3.0' ) ) ) }}:
-      suffixTemp: ci
-      packSuffixSwitchTemp: --version-suffix ci
-      emgSuffixSwitchTemp: --version-suffix ci$(buildNumber)
-      artifactSuffix: -ci
+    #${{ if or( eq( variables['Build.Reason'], 'PullRequest' ), not( endswith( variables['Build.SourceBranch'], 'release/3.0' ) ) ) }}:
+    #  suffixTemp: ci
+    #  packSuffixSwitchTemp: --version-suffix ci
+    #  emgSuffixSwitchTemp: --version-suffix ci$(buildNumber)
+    #  artifactSuffix: -ci
     suffix: $[variables.suffixTemp] # this resolves to an empty string if it is missing
     packSuffixSwitch: $[variables.packSuffixSwitchTemp]
     emgSuffixSwitch: $[variables.emgSuffixSwitchTemp]
