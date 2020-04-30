@@ -8,12 +8,14 @@ pr:
     include:
     - release/2.0
     - v2.x
+    - yojagad/TestBuild
 
 trigger:
   branches:
     include:
     - release/2.0
     - v2.x
+    - yojagad/TestBuild
 
 jobs:
 - job: InitializePipeline
