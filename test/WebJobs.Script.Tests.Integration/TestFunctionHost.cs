@@ -165,17 +165,29 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
             await _hostService.RestartHostAsync(cancellationToken);
         }
 
-        private async Task StartAsync()
+        private Task StartAsync()
         {
-            bool running = false;
-            while (!running)
+            var task = Task.Run(async () =>
             {
-                running = await IsHostStarted(HttpClient);
-
-                if (!running)
+                bool running = false;
+                while (!running)
                 {
-                    await Task.Delay(50);
+                    running = await IsHostStarted(HttpClient);
+
+                    if (!running)
+                    {
+                        await Task.Delay(500);
+                    }
                 }
+            });
+
+            if (task.Wait(TimeSpan.FromSeconds(30)))
+            {
+                return Task.CompletedTask;
+            }
+            else
+            {
+                throw new Exception("Timed out trying to start the host.");
             }
         }
 
