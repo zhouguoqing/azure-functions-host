@@ -180,8 +180,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
             _functions = functions;
             foreach (FunctionMetadata metadata in functions)
             {
-                _workerChannelLogger.LogDebug("Setting up FunctionInvocationBuffer for function:{functionName} with functionId:{id}", metadata.Name, metadata.GetFunctionId());
-                _functionInputBuffers[metadata.GetFunctionId()] = new BufferBlock<ScriptInvocationContext>();
+                _workerChannelLogger.LogDebug("Setting up FunctionInvocationBuffer for function:{functionName} with functionId:{id}", metadata.Name, metadata.FunctionId);
+                _functionInputBuffers[metadata.FunctionId] = new BufferBlock<ScriptInvocationContext>();
             }
             _state = _state | RpcWorkerChannelState.InvocationBuffersInitialized;
         }
@@ -190,7 +190,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         {
             if (_functions != null)
             {
-                foreach (FunctionMetadata metadata in _functions.OrderBy(metadata => metadata.IsDisabled()))
+                foreach (FunctionMetadata metadata in _functions.OrderBy(metadata => metadata.IsDisabled))
                 {
                     SendFunctionLoadRequest(metadata, managedDependencyOptions);
                 }
@@ -240,7 +240,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         internal void SendFunctionLoadRequest(FunctionMetadata metadata, ManagedDependencyOptions managedDependencyOptions)
         {
             _functionLoadRequestResponseEvent = _metricsLogger.LatencyEvent(MetricEventNames.FunctionLoadRequestResponse);
-            _workerChannelLogger.LogDebug("Sending FunctionLoadRequest for function:{functionName} with functionId:{id}", metadata.Name, metadata.GetFunctionId());
+            _workerChannelLogger.LogDebug("Sending FunctionLoadRequest for function:{functionName} with functionId:{id}", metadata.Name, metadata.FunctionId);
 
             // send a load request for the registered function
             SendStreamingMessage(new StreamingMessage
@@ -253,14 +253,14 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         {
             FunctionLoadRequest request = new FunctionLoadRequest()
             {
-                FunctionId = metadata.GetFunctionId(),
+                FunctionId = metadata.FunctionId,
                 Metadata = new RpcFunctionMetadata()
                 {
                     Name = metadata.Name,
                     Directory = metadata.FunctionDirectory ?? string.Empty,
                     EntryPoint = metadata.EntryPoint ?? string.Empty,
                     ScriptFile = metadata.ScriptFile ?? string.Empty,
-                    IsProxy = metadata.IsProxy()
+                    IsProxy = metadata.IsProxy
                 }
             };
 
@@ -313,10 +313,10 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         {
             try
             {
-                if (_functionLoadErrors.ContainsKey(context.FunctionMetadata.GetFunctionId()))
+                if (_functionLoadErrors.ContainsKey(context.FunctionMetadata.FunctionId))
                 {
                     _workerChannelLogger.LogDebug($"Function {context.FunctionMetadata.Name} failed to load");
-                    context.ResultSource.TrySetException(_functionLoadErrors[context.FunctionMetadata.GetFunctionId()]);
+                    context.ResultSource.TrySetException(_functionLoadErrors[context.FunctionMetadata.FunctionId]);
                     _executingInvocations.TryRemove(context.ExecutionContext.InvocationId.ToString(), out ScriptInvocationContext _);
                 }
                 else

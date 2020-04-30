@@ -501,7 +501,7 @@ namespace Microsoft.Azure.WebJobs.Script
             return null;
         }
 
-        public static string GetAssemblyNameFromMetadata(FunctionMetadata metadata, string suffix)
+        public static string GetAssemblyNameFromMetadata(Description.FunctionMetadata metadata, string suffix)
         {
             return AssemblyPrefix + metadata.Name + AssemblySeparator + suffix.GetHashCode().ToString();
         }
@@ -569,24 +569,24 @@ namespace Microsoft.Azure.WebJobs.Script
             {
                 throw new ArgumentNullException(nameof(functions));
             }
-            var filteredFunctions = functions.Where(f => !f.IsCodeless()).ToArray();
-            if (filteredFunctions.Length == 0)
+            var functionsListWithoutProxies = functions.Where(f => f.IsProxy == false).ToArray();
+            if (functionsListWithoutProxies.Length == 0)
             {
                 return true;
             }
             if (string.IsNullOrEmpty(workerRuntime))
             {
-                return filteredFunctions.Select(f => f.Language).Distinct().Count() <= 1;
+                return functionsListWithoutProxies.Select(f => f.Language).Distinct().Count() <= 1;
             }
-            return ContainsFunctionWithWorkerRuntime(filteredFunctions, workerRuntime);
+            return ContainsFunctionWithWorkerRuntime(functionsListWithoutProxies, workerRuntime);
         }
 
         internal static string GetWorkerRuntime(IEnumerable<FunctionMetadata> functions)
         {
             if (IsSingleLanguage(functions, null))
             {
-                var filteredFunctions = functions?.Where(f => !f.IsCodeless());
-                string functionLanguage = filteredFunctions.FirstOrDefault()?.Language;
+                var functionsListWithoutProxies = functions?.Where(f => f.IsProxy == false);
+                string functionLanguage = functionsListWithoutProxies.FirstOrDefault()?.Language;
                 if (string.IsNullOrEmpty(functionLanguage))
                 {
                     return null;

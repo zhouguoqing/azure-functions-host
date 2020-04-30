@@ -833,7 +833,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
         [InlineData("my proxy %")]
         public void UpdateProxyName(string proxyName)
         {
-            Assert.Equal("myproxy", ProxyFunctionProvider.NormalizeProxyName(proxyName));
+            Assert.Equal("myproxy", ProxyMetadataManager.NormalizeProxyName(proxyName));
         }
 
         [Fact]
@@ -859,9 +859,10 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
         [Fact]
         public void IsSingleLanguage_Returns_True_Proxy()
         {
-            ProxyFunctionMetadata proxy = new ProxyFunctionMetadata(null)
+            FunctionMetadata proxy = new FunctionMetadata()
             {
-                Name = "proxy"
+                Name = "proxy",
+                IsProxy = true
             };
             FunctionMetadata funcJs = new FunctionMetadata()
             {
@@ -878,13 +879,15 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
         [Fact]
         public void IsSingleLanguage_Returns_True_OnlyProxies()
         {
-            ProxyFunctionMetadata proxy1 = new ProxyFunctionMetadata(null)
+            FunctionMetadata proxy1 = new FunctionMetadata()
             {
-                Name = "proxy"
+                Name = "proxy",
+                IsProxy = true
             };
-            ProxyFunctionMetadata proxy2 = new ProxyFunctionMetadata(null)
+            FunctionMetadata proxy2 = new FunctionMetadata()
             {
-                Name = "proxy"
+                Name = "proxy",
+                IsProxy = true
             };
             IEnumerable<FunctionMetadata> functionsList = new Collection<FunctionMetadata>()
             {
@@ -896,13 +899,15 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
         [Fact]
         public void IsSingleLanguage_FunctionsWorkerRuntime_Set_Returns_True_OnlyProxies()
         {
-            ProxyFunctionMetadata proxy1 = new ProxyFunctionMetadata(null)
+            FunctionMetadata proxy1 = new FunctionMetadata()
             {
-                Name = "proxy"
+                Name = "proxy",
+                IsProxy = true
             };
-            ProxyFunctionMetadata proxy2 = new ProxyFunctionMetadata(null)
+            FunctionMetadata proxy2 = new FunctionMetadata()
             {
-                Name = "proxy"
+                Name = "proxy",
+                IsProxy = true
             };
             IEnumerable<FunctionMetadata> functionsList = new Collection<FunctionMetadata>()
             {
@@ -954,56 +959,6 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
                 funcPython1, funcCSharp1
             };
             Assert.False(Utility.IsSingleLanguage(functionsList, "node"));
-        }
-
-        [Theory]
-        [InlineData("python", "python")]
-        [InlineData("node", "node")]
-        [InlineData("dotnet", "dotnetassembly")]
-        [InlineData("java", "java")]
-        public void IsSingleLanguage_Codeless_AndAnother_Always_Returns_True(string workerRuntime, string language)
-        {
-            FunctionMetadata funcLanguage = new FunctionMetadata()
-            {
-                Name = "funcPython1",
-                Language = language,
-            };
-
-            // Codeless qualifies as any language
-            FunctionMetadata funcCodeless = new FunctionMetadata()
-            {
-                Name = "funcCSharp1",
-                Language = "DotNetAssembly",
-            };
-            funcCodeless.SetIsCodeless(true);
-
-            IEnumerable<FunctionMetadata> functionsList = new Collection<FunctionMetadata>()
-            {
-                funcLanguage, funcCodeless
-            };
-            Assert.True(Utility.IsSingleLanguage(functionsList, workerRuntime));
-        }
-
-        [Theory]
-        [InlineData("python")]
-        [InlineData("node")]
-        [InlineData("dotnet")]
-        [InlineData("java")]
-        public void IsSingleLanguage_Just_Codeless_Always_Returns_True(string workerRuntime)
-        {
-            // Codeless qualifies as any language
-            FunctionMetadata funcCodeless = new FunctionMetadata()
-            {
-                Name = "funcCSharp1",
-                Language = "DotNetAssembly",
-            };
-            funcCodeless.SetIsCodeless(true);
-
-            IEnumerable<FunctionMetadata> functionsList = new Collection<FunctionMetadata>()
-            {
-                funcCodeless
-            };
-            Assert.True(Utility.IsSingleLanguage(functionsList, workerRuntime));
         }
 
         [Fact]
@@ -1372,7 +1327,10 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
             ScriptHost.ValidateFunction(function.Object, httpFunctions);
 
             // add a proxy with same name
-            metadata = new ProxyFunctionMetadata(null);
+            metadata = new FunctionMetadata()
+            {
+                IsProxy = true
+            };
             function = new Mock<FunctionDescriptor>(MockBehavior.Strict, name, null, metadata, null, null, null, null);
             attribute = new HttpTriggerAttribute(AuthorizationLevel.Function, "get")
             {

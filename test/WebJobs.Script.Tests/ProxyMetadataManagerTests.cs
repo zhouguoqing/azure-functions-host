@@ -3,12 +3,8 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.Eventing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -17,10 +13,10 @@ using Xunit;
 
 namespace Microsoft.Azure.WebJobs.Script.Tests
 {
-    public class ProxyFunctionProviderTests
+    public class ProxyMetadataManagerTests
     {
         [Fact]
-        public async Task ProxyMetadata_WhenProxyFileChanges_IsRefreshed()
+        public void ProxyMetadata_WhenProxyFileChanges_IsRefreshed()
         {
             using (var tempDirectory = new TempDirectory())
             {
@@ -33,14 +29,14 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
                 var environment = new TestEnvironment();
                 var eventManager = new ScriptEventManager();
 
-                var provider = new ProxyFunctionProvider(options, environment, eventManager, NullLoggerFactory.Instance);
+                var manager = new ProxyMetadataManager(options, environment, eventManager, NullLoggerFactory.Instance);
 
                 // Get metadata before proxies exist
-                ImmutableArray<FunctionMetadata> proxyMetadata1 = await provider.GetFunctionMetadataAsync();
-                ImmutableArray<FunctionMetadata> proxyMetadata2 = await provider.GetFunctionMetadataAsync();
+                ProxyMetadataInfo proxyMetadata1 = manager.ProxyMetadata;
+                ProxyMetadataInfo proxyMetadata2 = manager.ProxyMetadata;
 
-                Assert.True(proxyMetadata2.IsDefaultOrEmpty);
-                Assert.True(proxyMetadata1.IsDefaultOrEmpty);
+                Assert.True(proxyMetadata2.Functions.IsDefaultOrEmpty);
+                Assert.Same(proxyMetadata1, proxyMetadata2);
 
                 // Update our proxies definition
                 FileUtility.CopyDirectory(testProxiesPath, tempDirectory.Path);
@@ -49,12 +45,11 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
                 eventManager.Publish(new FileEvent(EventSources.ScriptFiles,
                     new FileSystemEventArgs(WatcherChangeTypes.Changed, tempDirectory.Path, ScriptConstants.ProxyMetadataFileName)));
 
-                ImmutableArray<FunctionMetadata> proxyMetadata3 = await provider.GetFunctionMetadataAsync();
+                ProxyMetadataInfo proxyMetadata3 = manager.ProxyMetadata;
 
-                var proxyClient = (proxyMetadata3.FirstOrDefault() as ProxyFunctionMetadata).ProxyClient;
+                Assert.NotSame(proxyMetadata1, proxyMetadata3);
 
-                Assert.True(proxyMetadata3.Select(p => (p as ProxyFunctionMetadata).ProxyClient).All(c => c.Equals(proxyClient)));
-                Assert.Equal(19, proxyMetadata3.Length);
+                Assert.Equal(19, proxyMetadata3.Functions.Length);
             }
         }
     }

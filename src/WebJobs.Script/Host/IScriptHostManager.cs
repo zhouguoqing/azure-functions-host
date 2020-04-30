@@ -9,11 +9,6 @@ namespace Microsoft.Azure.WebJobs.Script
 {
     public interface IScriptHostManager
     {
-        /// <summary>
-        /// Host Initializing event delegate; called during Script Host initialization.
-        /// </summary>
-        event EventHandler HostInitializing;
-
         ScriptHostState State { get; }
 
         /// <summary>

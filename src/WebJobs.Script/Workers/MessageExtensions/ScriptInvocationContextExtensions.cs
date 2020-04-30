@@ -22,7 +22,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers
         {
             InvocationRequest invocationRequest = new InvocationRequest()
             {
-                FunctionId = context.FunctionMetadata.GetFunctionId(),
+                FunctionId = context.FunctionMetadata.FunctionId,
                 InvocationId = context.ExecutionContext.InvocationId.ToString(),
                 TraceContext = GetRpcTraceContext(context.Traceparent, context.Tracestate, context.Attributes, logger),
             };

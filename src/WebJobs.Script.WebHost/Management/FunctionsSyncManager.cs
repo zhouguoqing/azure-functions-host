@@ -53,12 +53,12 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
         private readonly IScriptWebHostEnvironment _webHostEnvironment;
         private readonly IEnvironment _environment;
         private readonly HostNameProvider _hostNameProvider;
-        private readonly IFunctionMetadataManager _functionMetadataManager;
+        private readonly IFunctionMetadataProvider _functionMetadataProvider;
         private readonly SemaphoreSlim _syncSemaphore = new SemaphoreSlim(1, 1);
 
         private CloudBlockBlob _hashBlob;
 
-        public FunctionsSyncManager(IConfiguration configuration, IHostIdProvider hostIdProvider, IOptionsMonitor<ScriptApplicationHostOptions> applicationHostOptions, ILogger<FunctionsSyncManager> logger, HttpClient httpClient, ISecretManagerProvider secretManagerProvider, IScriptWebHostEnvironment webHostEnvironment, IEnvironment environment, HostNameProvider hostNameProvider, IFunctionMetadataManager functionMetadataManager)
+        public FunctionsSyncManager(IConfiguration configuration, IHostIdProvider hostIdProvider, IOptionsMonitor<ScriptApplicationHostOptions> applicationHostOptions, ILogger<FunctionsSyncManager> logger, HttpClient httpClient, ISecretManagerProvider secretManagerProvider, IScriptWebHostEnvironment webHostEnvironment, IEnvironment environment, HostNameProvider hostNameProvider, IFunctionMetadataProvider functionMetadataProvider)
         {
             _applicationHostOptions = applicationHostOptions;
             _logger = logger;
@@ -69,7 +69,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             _webHostEnvironment = webHostEnvironment;
             _environment = environment;
             _hostNameProvider = hostNameProvider;
-            _functionMetadataManager = functionMetadataManager;
+            _functionMetadataProvider = functionMetadataProvider;
         }
 
         internal bool ArmCacheEnabled
@@ -267,7 +267,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
         public async Task<SyncTriggersPayload> GetSyncTriggersPayload()
         {
             var hostOptions = _applicationHostOptions.CurrentValue.ToHostOptions();
-            var functionsMetadata = _functionMetadataManager.GetFunctionMetadata().Where(m => !m.IsProxy());
+            var functionsMetadata = _functionMetadataProvider.GetFunctionMetadata();
 
             // trigger information used by the ScaleController
             var triggers = await GetFunctionTriggers(functionsMetadata, hostOptions);
@@ -288,11 +288,10 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
             JObject result = new JObject();
             result.Add("triggers", triggersArray);
 
-            // Add all listable functions details to the payload
+            // Add functions details to the payload
             JObject functions = new JObject();
             string routePrefix = await WebFunctionsManager.GetRoutePrefix(hostOptions.RootScriptPath);
-            var listableFunctions = _functionMetadataManager.GetFunctionMetadata().Where(m => !m.IsCodeless());
-            var functionDetails = await WebFunctionsManager.GetFunctionMetadataResponse(listableFunctions, hostOptions, _hostNameProvider);
+            var functionDetails = await WebFunctionsManager.GetFunctionMetadataResponse(functionsMetadata, hostOptions, _hostNameProvider);
             result.Add("functions", new JArray(functionDetails.Select(p => JObject.FromObject(p))));
 
             // Add functions secrets to the payload
@@ -315,7 +314,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
                 };
 
                 // add function secrets
-                var httpFunctions = functionsMetadata.Where(p => !p.IsProxy() && p.InputBindings.Any(q => q.IsTrigger && string.Compare(q.Type, "httptrigger", StringComparison.OrdinalIgnoreCase) == 0)).Select(p => p.Name).ToArray();
+                var httpFunctions = functionsMetadata.Where(p => !p.IsProxy && p.InputBindings.Any(q => q.IsTrigger && string.Compare(q.Type, "httptrigger", StringComparison.OrdinalIgnoreCase) == 0)).Select(p => p.Name).ToArray();
                 functionAppSecrets.Function = new FunctionAppSecrets.FunctionSecrets[httpFunctions.Length];
                 for (int i = 0; i < httpFunctions.Length; i++)
                 {
@@ -360,7 +359,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
         internal async Task<IEnumerable<JObject>> GetFunctionTriggers(IEnumerable<FunctionMetadata> functionsMetadata, ScriptJobHostOptions hostOptions)
         {
             var triggers = (await functionsMetadata
-                .Where(f => !f.IsProxy())
+                .Where(f => !f.IsProxy)
                 .Select(f => f.ToFunctionTrigger(hostOptions))
                 .WhenAll())
                 .Where(t => t != null);

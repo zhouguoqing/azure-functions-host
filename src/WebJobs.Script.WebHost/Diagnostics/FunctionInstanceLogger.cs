@@ -23,16 +23,18 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics
         private const string Key = "metadata";
 
         private readonly ILogWriter _writer;
+        private readonly IProxyMetadataManager _proxyMetadataManager;
         private readonly IMetricsLogger _metrics;
         private readonly IFunctionMetadataManager _metadataManager;
 
         public FunctionInstanceLogger(
             IFunctionMetadataManager metadataManager,
+            IProxyMetadataManager proxyMetadataManager,
             IMetricsLogger metrics,
             IHostIdProvider hostIdProvider,
             IConfiguration configuration,
             ILoggerFactory loggerFactory)
-            : this(metadataManager, metrics)
+            : this(metadataManager, proxyMetadataManager, metrics)
         {
             if (hostIdProvider == null)
             {
@@ -64,9 +66,10 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics
             }
         }
 
-        internal FunctionInstanceLogger(IFunctionMetadataManager metadataManager, IMetricsLogger metrics)
+        internal FunctionInstanceLogger(IFunctionMetadataManager metadataManager, IProxyMetadataManager proxyMetadataManager, IMetricsLogger metrics)
         {
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+            _proxyMetadataManager = proxyMetadataManager ?? throw new ArgumentNullException(nameof(proxyMetadataManager));
             _metadataManager = metadataManager ?? throw new ArgumentNullException(nameof(metadataManager));
         }
 
@@ -126,7 +129,8 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics
                 return functions.FirstOrDefault(p => Utility.FunctionNamesMatch(p.Name, functionName));
             }
 
-            return GetMetadataFromCollection(_metadataManager.GetFunctionMetadata());
+            return GetMetadataFromCollection(_metadataManager.Functions)
+                ?? GetMetadataFromCollection(_proxyMetadataManager.ProxyMetadata.Functions);
         }
 
         public Task FlushAsync(CancellationToken cancellationToken = default(CancellationToken))

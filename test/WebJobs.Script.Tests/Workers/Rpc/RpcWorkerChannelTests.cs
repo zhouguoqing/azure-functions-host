@@ -332,47 +332,39 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Workers.Rpc
             FunctionMetadata metadata = new FunctionMetadata()
             {
                 Language = "node",
-                Name = "js1"
+                Name = "js1",
+                FunctionId = "TestFunctionId1"
             };
-
-            metadata.SetFunctionId("TestFunctionId1");
-
             var functionLoadRequest = _workerChannel.GetFunctionLoadRequest(metadata, null);
             Assert.False(functionLoadRequest.Metadata.IsProxy);
-            ProxyFunctionMetadata proxyMetadata = new ProxyFunctionMetadata(null)
+            FunctionMetadata proxyMetadata = new FunctionMetadata()
             {
                 Language = "node",
-                Name = "js1"
+                Name = "js1",
+                FunctionId = "TestFunctionId1",
+                IsProxy = true
             };
-
-            metadata.SetFunctionId("TestFunctionId1");
-
             var proxyFunctionLoadRequest = _workerChannel.GetFunctionLoadRequest(proxyMetadata, null);
             Assert.True(proxyFunctionLoadRequest.Metadata.IsProxy);
         }
 
         private IEnumerable<FunctionMetadata> GetTestFunctionsList(string runtime)
         {
-            var metadata1 = new FunctionMetadata()
-            {
-                Language = runtime,
-                Name = "js1"
-            };
-
-            metadata1.SetFunctionId("TestFunctionId1");
-
-            var metadata2 = new FunctionMetadata()
-            {
-                Language = runtime,
-                Name = "js2",
-            };
-
-            metadata2.SetFunctionId("TestFunctionId2");
-
             return new List<FunctionMetadata>()
             {
-                metadata1,
-                metadata2
+                new FunctionMetadata()
+                {
+                     Language = runtime,
+                     Name = "js1",
+                     FunctionId = "TestFunctionId1"
+                },
+
+                new FunctionMetadata()
+                {
+                     Language = runtime,
+                     Name = "js2",
+                     FunctionId = "TestFunctionId2"
+                }
             };
         }
 
@@ -396,18 +388,15 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Workers.Rpc
 
         private IEnumerable<FunctionMetadata> GetTestFunctionsList_WithDisabled(string runtime, string funcName)
         {
-            var metadata = new FunctionMetadata()
-            {
-                Language = runtime,
-                Name = funcName
-            };
-
-            metadata.SetFunctionId("DisabledFunctionId1");
-            metadata.SetIsDisabled(true);
-
             var disabledList = new List<FunctionMetadata>()
             {
-                metadata
+                new FunctionMetadata()
+                {
+                    Language = runtime,
+                    Name = funcName,
+                    FunctionId = "DisabledFunctionId1",
+                    IsDisabled = true
+                }
             };
 
             return disabledList.Union(GetTestFunctionsList(runtime));

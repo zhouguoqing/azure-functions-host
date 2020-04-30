@@ -51,17 +51,16 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                     }
 
                     string route = httpTrigger.Route;
-                    bool isProxy = function.Metadata.IsProxy();
 
-                    if (string.IsNullOrEmpty(route) && !isProxy)
+                    if (string.IsNullOrEmpty(route) && !function.Metadata.IsProxy)
                     {
                         route = function.Name;
                     }
 
-                    WebJobsRouteBuilder builder = isProxy ? proxiesRoutesBuilder : routesBuilder;
+                    WebJobsRouteBuilder builder = function.Metadata.IsProxy ? proxiesRoutesBuilder : routesBuilder;
                     builder.MapFunctionRoute(function.Metadata.Name, route, constraints, function.Metadata.Name);
 
-                    LogRouteMap(routesLogBuilder, function.Metadata.Name, route, httpTrigger.Methods, isProxy, _httpOptions.Value.RoutePrefix);
+                    LogRouteMap(routesLogBuilder, function.Metadata.Name, route, httpTrigger.Methods, function.Metadata.IsProxy, _httpOptions.Value.RoutePrefix);
                 }
             }
 
