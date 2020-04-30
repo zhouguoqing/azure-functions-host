@@ -8,12 +8,16 @@ pr:
     include:
     - release/2.0
     - v2.x
+    - yojagad/TestBuild
+    - yojagad/RevertingAllTest
 
 trigger:
   branches:
     include:
     - release/2.0
     - v2.x
+    - yojagad/TestBuild
+    - yojagad/RevertingAllTest
 
 jobs:
 - job: InitializePipeline
@@ -63,7 +67,91 @@ jobs:
     displayName: "Build artifacts"
     inputs:
       filePath: '$(Build.Repository.LocalPath)\build.ps1'
-      arguments: '-buildNumber "$(buildNumber)" -suffix "$(suffix)" -bypassPackaging $false -signOutput $false'
+      arguments: '-buildNumber "$(buildNumber)" -suffix "$(suffix)"'
+  - task: DotNetCoreCLI@2
+    displayName: 'Build WebJobs.Script.Abstractions'
+    inputs:
+      command: 'build'
+      arguments: '-c Release'
+      projects: |
+        **\WebJobs.Script.Abstractions.csproj
+  - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@1
+    displayName: 'ESRP CodeSigning: Strong Name and Authenticode'
+    inputs:
+      ConnectedServiceName: 'ESRP Service'
+      FolderPath: 'src\WebJobs.Script.Abstractions\bin\Release'
+      Pattern: Microsoft.Azure.WebJobs.Script.Abstractions*.dll
+      signConfigType: inlineSignParams
+      inlineOperation: |
+        [
+          {
+            "KeyCode": "CP-230012",
+            "OperationCode": "SigntoolSign",
+            "Parameters": {
+              "OpusName": "Microsoft",
+              "OpusInfo": "http://www.microsoft.com",
+              "FileDigest": "/fd \"SHA256\"",
+              "PageHash": "/NPH",
+              "TimeStamp": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+            },
+            "ToolName": "sign",
+            "ToolVersion": "1.0"
+          },
+          {
+            "KeyCode": "CP-230012",
+            "OperationCode": "SigntoolVerify",
+            "Parameters": {},
+            "ToolName": "sign",
+            "ToolVersion": "1.0"
+          }
+        ]
+  - task: DeleteFiles@1
+    displayName: 'Delete CodeSignSummary files'
+    inputs:
+      contents: '**\CodeSignSummary-*.md'
+  - task: DotNetCoreCLI@2
+    displayName: 'Pack WebJobs.Script.Abstractions package'
+    inputs:
+      command: 'custom'
+      custom: 'pack'
+      arguments: '--no-build -c Release -o packages\WebJobs.Script.Abstractions -p:PackageVersion=2.0.$(buildNumber)$(suffix)'
+      projects: |
+        **\WebJobs.Script.Abstractions.csproj
+  - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@1
+    displayName: 'ESRP CodeSigning: Nupkg'
+    inputs:
+      ConnectedServiceName: 'ESRP Service'
+      FolderPath: 'packages\WebJobs.Script.Abstractions'
+      Pattern: 'Microsoft.Azure.WebJobs.Script.Abstractions*.nupkg'
+      signConfigType: inlineSignParams
+      inlineOperation: |
+        [
+            {
+              "KeyCode": "CP-401405",
+              "OperationCode": "NuGetSign",
+              "Parameters": {},
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            },
+            {
+              "KeyCode": "CP-401405",
+              "OperationCode": "NuGetVerify",
+              "Parameters": {},
+              "ToolName": "sign",
+              "ToolVersion": "1.0"
+            }
+        ]
+  - task: DeleteFiles@1
+    displayName: 'Delete CodeSignSummary files'
+    inputs:
+      contents: '**\CodeSignSummary-*.md'
+  - task: DotNetCoreCLI@2
+    displayName: 'Build ExtensionsMetadataGenerator'
+    inputs:
+      command: 'build'      
+      arguments: '-c Release'
+      projects: |
+        **\ExtensionsMetadataGenerator.csproj
   - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@1
     displayName: 'ESRP CodeSigning: Strong Name and Authenticode'
     inputs:
@@ -112,11 +200,19 @@ jobs:
     displayName: 'Delete CodeSignSummary files'
     inputs:
       contents: '**\CodeSignSummary-*.md'
+  - task: DotNetCoreCLI@2
+    displayName: 'Pack ExtensionsMetadataGenerator package'
+    inputs:
+     command: 'custom'
+     custom: 'pack'
+     arguments: '--no-build -c Release -o packages\ExtensionsMetadataGenerator'
+     projects: |
+        **\ExtensionsMetadataGenerator.csproj
   - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@1
     displayName: 'ESRP CodeSigning: Nupkg'
     inputs:
       ConnectedServiceName: 'ESRP Service'
-      FolderPath: '..\..\..\buildoutput'
+      FolderPath: 'packages\ExtensionsMetadataGenerator'
       Pattern: 'Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator*.nupkg'
       signConfigType: inlineSignParams
       inlineOperation: |
@@ -143,11 +239,6 @@ jobs:
   - task: CopyFiles@2
     inputs:
       SourceFolder: '..\..\..\buildoutput'
-      Contents: 'Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator*.nupkg'
-      TargetFolder: '$(Build.ArtifactStagingDirectory)\ExtensionsMetadataGenerator'
-  - task: CopyFiles@2
-    inputs:
-      SourceFolder: '..\..\..\buildoutput'
       Contents: 'WebJobs.Script.Performance.App*.nupkg'
       TargetFolder: '$(Build.ArtifactStagingDirectory)\Performance'
   - task: CopyFiles@2
@@ -160,6 +251,8 @@ jobs:
       SourceFolder: '$(Build.Repository.LocalPath)\buildoutput'
       Contents: '*.zip'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
+  - publish: $(Build.Repository.LocalPath)\packages\ExtensionsMetadataGenerator
+    artifact: Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator$(suffix)
   - publish: $(Build.ArtifactStagingDirectory)\Functions.2.0.$(buildNumber)$(suffix).no-runtime.zip
     artifact: Functions.2.0.$(buildNumber)$(suffix).no-runtime
   - publish: $(Build.ArtifactStagingDirectory)\Functions.Binaries.2.0.$(buildNumber)$(suffix).no-runtime.zip
@@ -180,10 +273,10 @@ jobs:
     artifact: Microsoft.Azure.WebJobs.Script.2.0.$(buildNumber)$(suffix)
   - publish: $(Build.ArtifactStagingDirectory)\Microsoft.Azure.WebJobs.Script.Grpc.2.0.$(buildNumber)$(suffix).nupkg
     artifact: Microsoft.Azure.WebJobs.Script.Grpc.2.0.$(buildNumber)$(suffix)
+  - publish: $(Build.Repository.LocalPath)\packages\WebJobs.Script.Abstractions\Microsoft.Azure.WebJobs.Script.Abstractions.2.0.$(buildNumber)$(suffix).nupkg
+    artifact: Microsoft.Azure.WebJobs.Script.Abstractions.2.0.$(buildNumber)$(suffix)
   - publish: $(Build.ArtifactStagingDirectory)\Microsoft.Azure.WebJobs.Script.WebHost.2.0.$(buildNumber)$(suffix).nupkg
     artifact: Microsoft.Azure.WebJobs.Script.WebHost.2.0.$(buildNumber)$(suffix)
-  - publish: $(Build.ArtifactStagingDirectory)\ExtensionsMetadataGenerator
-    artifact: Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator$(suffix)
     condition: succeeded()
   - publish: $(Build.ArtifactStagingDirectory)\Performance
     artifact: WebJobs.Script.Performance.App$(suffix)
