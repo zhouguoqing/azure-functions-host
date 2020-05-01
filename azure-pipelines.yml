@@ -50,7 +50,6 @@ jobs:
   dependsOn: InitializePipeline
   variables:
     suffix: $[ dependencies.InitializePipeline.outputs['Initialize.Suffix'] ]
-  condition: and(succeeded(), eq(dependencies.InitializePipeline.outputs['Initialize.BypassPackaging'], false))
   pool:
     vmImage: 'vs2017-win2016' 
   steps:
