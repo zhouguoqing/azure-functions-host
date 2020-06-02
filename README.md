@@ -2,8 +2,11 @@
 
 |Branch|Status|
 |---|---|
-|master|[![Build status](https://ci.appveyor.com/api/projects/status/a6j46j1tawdfs3js?svg=true&branch=master)](https://ci.appveyor.com/project/appsvc/azure-webjobs-sdk-script-y8o14?branch=master)|
-|dev|[![Build status](https://ci.appveyor.com/api/projects/status/a6j46j1tawdfs3js?svg=true&branch=dev)](https://ci.appveyor.com/project/appsvc/azure-webjobs-sdk-script-y8o14?branch=dev)|
+|dev|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/Azure.azure-functions-host?branchName=dev)](https://azfunc.visualstudio.com/Azure%20Functions/_build?definitionId=37&repositoryFilter=3&branchFilter=848)|
+|v2.x|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/Azure.azure-functions-host?branchName=v2.x)](https://azfunc.visualstudio.com/Azure%20Functions/_build?definitionId=37&_a=summary&repositoryFilter=3&branchFilter=923)|
+|release/3.0|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/Azure.azure-functions-host?branchName=release/3.0)](https://azfunc.visualstudio.com/Azure%20Functions/_build?definitionId=37&_a=summary&repositoryFilter=3&branchFilter=583)|
+|release/2.0|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/Azure.azure-functions-host?branchName=release/2.0)](https://azfunc.visualstudio.com/Azure%20Functions/_build?definitionId=37&_a=summary&repositoryFilter=3&branchFilter=927)|
+|release/ExtensionsMetadataGenerator/1.1|[![Build status](https://azfunc.visualstudio.com/Azure%20Functions/_apis/build/status/Azure.azure-functions-host?branchName=release/ExtensionsMetadataGenerator/1.1)](https://azfunc.visualstudio.com/Azure%20Functions/_build?definitionId=37&_a=summary&repositoryFilter=3&branchFilter=1042)|
 |v1.x|[![Build status](https://ci.appveyor.com/api/projects/status/a6j46j1tawdfs3js?svg=true&branch=v1.x)](https://ci.appveyor.com/project/appsvc/azure-webjobs-sdk-script-y8o14?branch=v1.x)|
 
 WebJobs.Script
