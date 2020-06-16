@@ -37,29 +37,9 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.DependencyInjection
                 }, TaskContinuationOptions.ExecuteSynchronously);
         }
 
-        internal ServiceScope CreateChildScope(IServiceScopeFactory rootScopeFactory)
+        internal IServiceScope CreateChildScope(IServiceScopeFactory rootScopeFactory)
         {
-            var scopedRoot = rootScopeFactory.CreateScope();
-            var preferInterpretation = (Container as Container).PreferInterpretation;
-            Container scopedContext = Container.OpenScope(preferInterpretation: preferInterpretation) as Container;
-
-            Rules rules = scopedContext.Rules;
-            foreach (var unknownServiceResolver in scopedContext.Rules.UnknownServiceResolvers)
-            {
-                rules = rules.WithoutUnknownServiceResolver(unknownServiceResolver);
-            }
-
-            var resolver = scopedContext.With(r => rules.WithUnknownServiceResolvers(request =>
-              {
-                  return new DelegateFactory(_ => scopedRoot.ServiceProvider.GetService(request.ServiceType), setup: _rootScopeFactorySetup);
-              }));
-
-            var scope = new ServiceScope(resolver, scopedRoot);
-            ChildScopes.TryAdd(scope, null);
-
-            scope.DisposalTask.ContinueWith(t => ChildScopes.TryRemove(scope, out object _));
-
-            return scope;
+            return rootScopeFactory.CreateScope();
         }
     }
 }
