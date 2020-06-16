@@ -35,10 +35,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
 
         public async Task Invoke(HttpContext context)
         {
-            if (_next != null)
-            {
-                await _next(context);
-            }
+            await _next(context);
 
             var functionExecution = context.Features.Get<IFunctionExecutionFeature>();
             if (functionExecution != null && !context.Response.HasStarted)
@@ -52,33 +49,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
 
         private async Task<IActionResult> GetResultAsync(HttpContext context, IFunctionExecutionFeature functionExecution)
         {
-            if (functionExecution.Descriptor == null)
-            {
-                return new NotFoundResult();
-            }
-
-            if (context.Request.IsColdStart() && !context.Items.ContainsKey(ScriptConstants.AzureFunctionsColdStartKey))
-            {
-                // for cold start requests we want to measure the request
-                // pipeline dispatch time
-                // important that this stopwatch is started as early as possible
-                // in the pipeline (in this case, in our first middleware)
-                var sw = new Stopwatch();
-                sw.Start();
-                context.Items[ScriptConstants.AzureFunctionsColdStartKey] = sw;
-            }
-
-            // If the function is disabled, return 'NotFound', unless the request is being made with Admin credentials
-            if (functionExecution.Descriptor.Metadata.IsDisabled() &&
-                !AuthUtility.PrincipalHasAuthLevelClaim(context.User, AuthorizationLevel.Admin))
-            {
-                return new NotFoundResult();
-            }
-
-            if (functionExecution.CanExecute)
-            {
-                await functionExecution.ExecuteAsync(context.Request, CancellationToken.None);
-            }
+            await functionExecution.ExecuteAsync(context.Request, CancellationToken.None);
 
             if (context.Items.TryGetValue(ScriptConstants.AzureFunctionsHttpResponseKey, out object result) && result is IActionResult actionResult)
             {
