@@ -34,11 +34,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Features
 
         public async Task ExecuteAsync(HttpRequest request, CancellationToken cancellationToken)
         {
-            if (!CanExecute)
-            {
-                throw new InvalidOperationException("Unable to execute function without a target.");
-            }
-
             var arguments = new Dictionary<string, object>()
             {
                 { _descriptor.TriggerParameter.Name, request }
