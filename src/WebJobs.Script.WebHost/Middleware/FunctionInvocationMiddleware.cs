@@ -68,8 +68,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
                 context.Items[ScriptConstants.AzureFunctionsColdStartKey] = sw;
             }
 
-            PopulateRouteData(context);
-
             // If the function is disabled, return 'NotFound', unless the request is being made with Admin credentials
             if (functionExecution.Descriptor.Metadata.IsDisabled() &&
                 !AuthUtility.PrincipalHasAuthLevelClaim(context.User, AuthorizationLevel.Admin))
@@ -102,34 +100,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
             }
 
             return new OkResult();
-        }
-
-        private void PopulateRouteData(HttpContext context)
-        {
-            // Add route data to request info
-            // TODO: Keeping this here for now as other code depend on this property, but this can be done in the HTTP binding.
-            var routingFeature = context.Features.Get<IRoutingFeature>();
-
-            var routeData = new Dictionary<string, object>(routingFeature.RouteData.Values);
-
-            // Get optional parameters that were not used and had no default
-            Route functionRoute = routingFeature.RouteData.Routers.FirstOrDefault(r => r is Route) as Route;
-
-            if (functionRoute != null)
-            {
-                var optionalParameters = functionRoute.ParsedTemplate.Parameters.Where(p => p.IsOptional && p.DefaultValue == null);
-
-                foreach (var parameter in optionalParameters)
-                {
-                    // Make sure we didn't have the parameter in the values dictionary
-                    if (!routeData.ContainsKey(parameter.Name))
-                    {
-                        routeData.Add(parameter.Name, null);
-                    }
-                }
-            }
-
-            context.Items[HttpExtensionConstants.AzureWebJobsHttpRouteDataKey] = routeData;
         }
     }
 }
