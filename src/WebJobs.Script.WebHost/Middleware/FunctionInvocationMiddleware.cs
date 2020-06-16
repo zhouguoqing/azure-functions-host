@@ -77,21 +77,9 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
 
             if (functionExecution.CanExecute)
             {
-                // Add the request to the logging scope. This allows the App Insights logger to
-                // record details about the request.
-                ILoggerFactory loggerFactory = context.RequestServices.GetService<ILoggerFactory>();
-                ILogger logger = loggerFactory.CreateLogger(LogCategories.CreateFunctionCategory(functionExecution.Descriptor.Name));
-                var scopeState = new Dictionary<string, object>()
-                {
-                    [ScriptConstants.LoggerHttpRequest] = context.Request,
-                };
-
-                using (logger.BeginScope(scopeState))
-                {
-                    var applicationLifetime = context.RequestServices.GetService<IApplicationLifetime>();
-                    CancellationToken cancellationToken = applicationLifetime != null ? applicationLifetime.ApplicationStopping : CancellationToken.None;
-                    await functionExecution.ExecuteAsync(context.Request, cancellationToken);
-                }
+                var applicationLifetime = context.RequestServices.GetService<IApplicationLifetime>();
+                CancellationToken cancellationToken = applicationLifetime != null ? applicationLifetime.ApplicationStopping : CancellationToken.None;
+                await functionExecution.ExecuteAsync(context.Request, cancellationToken);
             }
 
             if (context.Items.TryGetValue(ScriptConstants.AzureFunctionsHttpResponseKey, out object result) && result is IActionResult actionResult)
