@@ -77,9 +77,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
 
             if (functionExecution.CanExecute)
             {
-                var applicationLifetime = context.RequestServices.GetService<IApplicationLifetime>();
-                CancellationToken cancellationToken = applicationLifetime != null ? applicationLifetime.ApplicationStopping : CancellationToken.None;
-                await functionExecution.ExecuteAsync(context.Request, cancellationToken);
+                await functionExecution.ExecuteAsync(context.Request, CancellationToken.None);
             }
 
             if (context.Items.TryGetValue(ScriptConstants.AzureFunctionsHttpResponseKey, out object result) && result is IActionResult actionResult)
