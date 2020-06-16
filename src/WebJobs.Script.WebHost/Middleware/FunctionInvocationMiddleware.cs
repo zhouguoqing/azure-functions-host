@@ -70,12 +70,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
 
             PopulateRouteData(context);
 
-            bool authorized = await AuthenticateAndAuthorizeAsync(context, functionExecution.Descriptor);
-            if (!authorized)
-            {
-                return new UnauthorizedResult();
-            }
-
             // If the function is disabled, return 'NotFound', unless the request is being made with Admin credentials
             if (functionExecution.Descriptor.Metadata.IsDisabled() &&
                 !AuthUtility.PrincipalHasAuthLevelClaim(context.User, AuthorizationLevel.Admin))
@@ -136,48 +130,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
             }
 
             context.Items[HttpExtensionConstants.AzureWebJobsHttpRouteDataKey] = routeData;
-        }
-
-        private async Task<bool> AuthenticateAndAuthorizeAsync(HttpContext context, FunctionDescriptor descriptor)
-        {
-            if (RequiresAuthz(context.Request, descriptor))
-            {
-                // Authenticate the request
-                var policyEvaluator = context.RequestServices.GetRequiredService<IPolicyEvaluator>();
-                var policy = AuthUtility.DefaultFunctionPolicy;
-                var authenticateResult = await policyEvaluator.AuthenticateAsync(policy, context);
-
-                // Authorize using the function policy and resource
-                var authorizeResult = await policyEvaluator.AuthorizeAsync(policy, authenticateResult, context, descriptor);
-
-                return authorizeResult.Succeeded;
-            }
-            else
-            {
-                return true;
-            }
-        }
-
-        internal static bool RequiresAuthz(HttpRequest request, FunctionDescriptor descriptor)
-        {
-            if (descriptor.Metadata.IsProxy())
-            {
-                return false;
-            }
-
-            var httpTrigger = descriptor.HttpTriggerAttribute;
-            if (httpTrigger?.AuthLevel == AuthorizationLevel.Anonymous &&
-                !request.Headers.ContainsKey(ScriptConstants.EasyAuthIdentityHeader) &&
-                !request.Headers.ContainsKey(AuthenticationLevelHandler.FunctionsKeyHeaderName) &&
-                !request.Query.ContainsKey(AuthenticationLevelHandler.FunctionsKeyQueryParamName))
-            {
-                // Anonymous functions w/o any of our special request headers don't require authz.
-                // In cases where the function is anonymous but has one of these headers, we run
-                // authz so claims are populated.
-                return false;
-            }
-
-            return true;
         }
     }
 }
