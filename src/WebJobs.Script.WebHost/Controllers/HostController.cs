@@ -111,7 +111,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
             _logger.LogInformation("Received request for draining host");
 
             // Stop call to some listeners get stuck, Not waiting for the stop call to complete
-            drainModeManager.EnableDrainModeAsync().ConfigureAwait(false);
+            drainModeManager.EnableDrainModeAsync(CancellationToken.None).ConfigureAwait(false);
             return Ok();
         }
 
