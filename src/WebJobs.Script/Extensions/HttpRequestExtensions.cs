@@ -124,15 +124,15 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             return false;
         }
 
-        public static async Task<HttpRequestMessage> GetProxyHttpRequest(this HttpRequest request, string requestUri, string invocationId)
+        public static Task<HttpRequestMessage> GetProxyHttpRequest(this HttpRequest request, string requestUri, string invocationId)
         {
             HttpRequestMessage proxyRequest = new HttpRequestMessage();
             proxyRequest.RequestUri = new Uri(QueryHelpers.AddQueryString(requestUri, request.GetQueryCollectionAsDictionary()));
 
-            /*foreach (var header in request.Headers)
+            foreach (var header in request.Headers)
             {
                 proxyRequest.Headers.TryAddWithoutValidation(header.Key, header.Value.FirstOrDefault());
-            }*/
+            }
 
             proxyRequest.Headers.Add(HttpWorkerConstants.HostVersionHeaderName, ScriptHost.Version);
             proxyRequest.Headers.Add(HttpWorkerConstants.InvocationIdHeaderName, invocationId);
@@ -141,10 +141,11 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             proxyRequest.Method = new HttpMethod(request.Method);
 
             // Copy body
-            MemoryStream ms = new MemoryStream();
+            /*MemoryStream ms = new MemoryStream();
             await request.Body.CopyToAsync(ms);
             ms.Position = 0;
             proxyRequest.Content = new StreamContent(ms);
+            var a = ms.Length;
 
             if (!string.IsNullOrEmpty(request.ContentType))
             {
@@ -153,9 +154,9 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             if (request.ContentLength != null)
             {
                 proxyRequest.Content.Headers.Add("Content-Length", request.ContentLength.ToString());
-            }
+            }*/
 
-            return proxyRequest;
+            return Task.FromResult(proxyRequest);
         }
 
         public static async Task<JObject> GetRequestAsJObject(this HttpRequest request)
