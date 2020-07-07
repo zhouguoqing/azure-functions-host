@@ -141,21 +141,15 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             proxyRequest.Method = new HttpMethod(request.Method);
 
             // Copy body
-            proxyRequest.Content = new StreamContent(request.Body);
-
-            /*MemoryStream ms = new MemoryStream();
-            await request.Body.CopyToAsync(ms);
-            ms.Position = 0;
-            proxyRequest.Content = new StreamContent(ms);
-            var a = ms.Length;*/
-
-            if (!string.IsNullOrEmpty(request.ContentType))
+            if (request.ContentLength != null && request.ContentLength > 0)
             {
-                proxyRequest.Content.Headers.Add("Content-Type", request.ContentType);
-            }
-            if (request.ContentLength != null)
-            {
+                proxyRequest.Content = new StreamContent(request.Body);
                 proxyRequest.Content.Headers.Add("Content-Length", request.ContentLength.ToString());
+
+                if (!string.IsNullOrEmpty(request.ContentType))
+                {
+                    proxyRequest.Content.Headers.Add("Content-Type", request.ContentType);
+                }
             }
 
             return Task.FromResult(proxyRequest);
