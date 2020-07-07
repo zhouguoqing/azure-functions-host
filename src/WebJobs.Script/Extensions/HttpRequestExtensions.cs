@@ -129,10 +129,11 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             HttpRequestMessage proxyRequest = new HttpRequestMessage();
             proxyRequest.RequestUri = new Uri(QueryHelpers.AddQueryString(requestUri, request.GetQueryCollectionAsDictionary()));
 
-            foreach (var header in request.Headers)
+            /*foreach (var header in request.Headers)
             {
                 proxyRequest.Headers.TryAddWithoutValidation(header.Key, header.Value.FirstOrDefault());
-            }
+            }*/
+
             proxyRequest.Headers.Add(HttpWorkerConstants.HostVersionHeaderName, ScriptHost.Version);
             proxyRequest.Headers.Add(HttpWorkerConstants.InvocationIdHeaderName, invocationId);
             proxyRequest.Headers.UserAgent.ParseAdd($"{HttpWorkerConstants.UserAgentHeaderValue}/{ScriptHost.Version}");
