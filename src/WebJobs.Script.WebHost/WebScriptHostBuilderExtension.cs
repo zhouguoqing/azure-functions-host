@@ -93,10 +93,10 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                     services.TryAddSingleton<IScriptWebHookProvider>(p => p.GetService<DefaultScriptWebHookProvider>());
                     services.TryAddSingleton<IWebHookProvider>(p => p.GetService<DefaultScriptWebHookProvider>());
                     services.TryAddSingleton<IJobHostMiddlewarePipeline, DefaultMiddlewarePipeline>();
-                    if (environment.IsLinuxConsumption())
-                    {
-                        services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHostHttpMiddleware, JobHostEasyAuthMiddleware>());
-                    }
+                    //if (environment.IsLinuxConsumption())
+                    //{
+                    //    services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHostHttpMiddleware, JobHostEasyAuthMiddleware>());
+                    //}
                     services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHostHttpMiddleware, CustomHttpHeadersMiddleware>());
                     services.TryAddEnumerable(ServiceDescriptor.Singleton<IJobHostHttpMiddleware, HstsConfigurationMiddleware>());
                     if (environment.IsLinuxConsumption())
