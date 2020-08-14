@@ -191,6 +191,7 @@ namespace Microsoft.Azure.WebJobs.Script.Description
 
                 if (File.Exists(path))
                 {
+                    Console.WriteLine($"Loading assembly {assemblyName.FullName} from {path}");
                     return LoadFromAssemblyPath(path);
                 }
             }

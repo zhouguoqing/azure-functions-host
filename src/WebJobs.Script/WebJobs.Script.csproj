@@ -2,7 +2,7 @@
   <Import Project="..\..\build\common.props" />
   <PropertyGroup>
     <PackageId>Microsoft.Azure.WebJobs.Script</PackageId>
-    <PackageIconUrl>https://raw.githubusercontent.com/Azure/azure-webjobs-sdk/dev/webjobs.png</PackageIconUrl>
+    <Icon>webjobs.png</Icon>
     <AssemblyName>Microsoft.Azure.WebJobs.Script</AssemblyName>
     <RootNamespace>Microsoft.Azure.WebJobs.Script</RootNamespace>
   </PropertyGroup>
