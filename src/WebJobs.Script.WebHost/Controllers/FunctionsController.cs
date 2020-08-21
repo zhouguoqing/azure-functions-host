@@ -187,20 +187,27 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
             var path = webHostOptions.Value.ScriptPath;
             _logger.LogInformation($"Download Path is {path}");
             var dirInfo = FileUtility.DirectoryInfoFromDirectoryName(path);
+            return GetResult(dirInfo);
+        }
+
+        private FileCallbackResult GetResult(DirectoryInfoBase dirInfo)
+        {
             return new FileCallbackResult(new MediaTypeHeaderValue("application/octet-stream"), async (outputStream, _) =>
             {
-                var zipArchive = new ZipArchive(outputStream, ZipArchiveMode.Create);
-                foreach (FileSystemInfoBase fileSysInfo in dirInfo.GetFileSystemInfos())
+                using (var zipArchive = new ZipArchive(outputStream, ZipArchiveMode.Create))
                 {
-                    _logger.LogInformation($"File is {fileSysInfo.FullName}");
-                    if (fileSysInfo is DirectoryInfoBase directoryInfo)
+                    foreach (FileSystemInfoBase fileSysInfo in dirInfo.GetFileSystemInfos())
                     {
-                        await zipArchive.AddDirectory(directoryInfo, fileSysInfo.Name);
-                    }
-                    else
-                    {
-                        // Add it at the root of the zip
-                        await zipArchive.AddFile(fileSysInfo.FullName, string.Empty);
+                        _logger.LogInformation($"File is {fileSysInfo.FullName}");
+                        if (fileSysInfo is DirectoryInfoBase directoryInfo)
+                        {
+                            await zipArchive.AddDirectory(directoryInfo, fileSysInfo.Name);
+                        }
+                        else
+                        {
+                            // Add it at the root of the zip
+                            await zipArchive.AddFile(fileSysInfo.FullName, string.Empty);
+                        }
                     }
                 }
             })

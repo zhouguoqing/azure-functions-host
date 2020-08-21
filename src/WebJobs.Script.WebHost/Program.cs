@@ -41,6 +41,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                 .ConfigureKestrel(o =>
                 {
                     o.Limits.MaxRequestBodySize = 104857600;
+                    o.AllowSynchronousIO = true;
                 })
                 .UseSetting(WebHostDefaults.EnvironmentKey, Environment.GetEnvironmentVariable(EnvironmentSettingNames.EnvironmentNameKey))
                 .ConfigureServices(services =>
@@ -48,6 +49,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                     services.Configure<IISServerOptions>(o =>
                     {
                         o.MaxRequestBodySize = 104857600;
+                        o.AllowSynchronousIO = true;
                     });
                     services.Replace(ServiceDescriptor.Singleton<IServiceProviderFactory<IServiceCollection>>(new WebHostServiceProviderFactory()));
                 })
