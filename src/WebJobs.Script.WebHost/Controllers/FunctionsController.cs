@@ -186,12 +186,14 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
         {
             var path = webHostOptions.Value.ScriptPath;
             var dirInfo = FileUtility.DirectoryInfoFromDirectoryName(path);
+            _logger.LogInformation($"Downloading files from {path}");
             return new FileCallbackResult(new MediaTypeHeaderValue("application/octet-stream"), async (outputStream, _) =>
             {
                 using (var zipArchive = new ZipArchive(outputStream, ZipArchiveMode.Create))
                 {
                     foreach (FileSystemInfoBase fileSysInfo in dirInfo.GetFileSystemInfos())
                     {
+                        _logger.LogInformation($"Downloading file {fileSysInfo.FullName}");
                         if (fileSysInfo is DirectoryInfoBase directoryInfo)
                         {
                             await zipArchive.AddDirectory(directoryInfo, fileSysInfo.Name);
