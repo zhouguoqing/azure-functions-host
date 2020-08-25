@@ -160,7 +160,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
 
         [HttpDelete]
         [Route("admin/functions/{name}")]
-        [Authorize(Policy = PolicyNames.AdminAuthLevel)]
+        // [Authorize(Policy = PolicyNames.AdminAuthLevel)]
         public async Task<IActionResult> Delete(string name)
         {
             (var found, var function) = await _functionsManager.TryGetFunction(name, Request);
@@ -183,7 +183,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
 
         [HttpGet]
         [Route("admin/functions/download")]
-        [Authorize(Policy = PolicyNames.AdminAuthLevel)]
+        // [Authorize(Policy = PolicyNames.AdminAuthLevel)]
         public IActionResult Download([FromServices] IOptions<ScriptApplicationHostOptions> webHostOptions)
         {
             var path = webHostOptions.Value.ScriptPath;

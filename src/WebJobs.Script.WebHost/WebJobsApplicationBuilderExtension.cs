@@ -52,7 +52,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             }
 
             builder.UseMiddleware<ExceptionMiddleware>();
-            builder.UseMiddleware<ResponseBufferingMiddleware>();
+            // builder.UseMiddleware<ResponseBufferingMiddleware>();
             builder.UseMiddleware<HomepageMiddleware>();
             builder.UseWhen(context => !context.Request.IsAdminRequest(), config =>
             {
