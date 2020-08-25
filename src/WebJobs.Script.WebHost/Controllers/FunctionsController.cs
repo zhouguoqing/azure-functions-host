@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+using System;
 using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.IO.Compression;
@@ -18,6 +19,7 @@ using Microsoft.Azure.WebJobs.Script.WebHost.Filters;
 using Microsoft.Azure.WebJobs.Script.WebHost.Management;
 using Microsoft.Azure.WebJobs.Script.WebHost.Models;
 using Microsoft.Azure.WebJobs.Script.WebHost.Security.Authorization.Policies;
+using Microsoft.Azure.WebJobs.Script.Workers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
@@ -191,18 +193,25 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Controllers
             {
                 using (var zipArchive = new ZipArchive(outputStream, ZipArchiveMode.Create))
                 {
-                    foreach (FileSystemInfoBase fileSysInfo in dirInfo.GetFileSystemInfos())
+                    try
                     {
-                        _logger.LogInformation($"Downloading file {fileSysInfo.FullName}");
-                        if (fileSysInfo is DirectoryInfoBase directoryInfo)
+                        foreach (FileSystemInfoBase fileSysInfo in dirInfo.GetFileSystemInfos())
                         {
-                            await zipArchive.AddDirectory(directoryInfo, fileSysInfo.Name);
+                            _logger.LogInformation($"Downloading file {fileSysInfo.FullName}");
+                            if (fileSysInfo is DirectoryInfoBase directoryInfo)
+                            {
+                                await zipArchive.AddDirectory(directoryInfo, fileSysInfo.Name);
+                            }
+                            else
+                            {
+                                // Add it at the root of the zip
+                                await zipArchive.AddFile(fileSysInfo.FullName, string.Empty);
+                            }
                         }
-                        else
-                        {
-                            // Add it at the root of the zip
-                            await zipArchive.AddFile(fileSysInfo.FullName, string.Empty);
-                        }
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.LogError(e, "/admin/functions/download errors");
                     }
                 }
             })
