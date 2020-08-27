@@ -53,8 +53,12 @@ $crankConfigPath = Join-Path `
                     -Path (Split-Path $PSCommandPath -Parent) `
                     -ChildPath 'benchmarks.yml'
 
+$isLinuxApp = $CrankAgentVm -match '^functions-crank-linux\.'
+
+$functionAppRootPath = $isLinuxApp ? '/home/Functions/FunctionApps' : 'C:\FunctionApps';
+                    
 $functionAppPath = Join-Path `
-                    -Path 'C:\FunctionApps' `
+                    -Path $functionAppRootPath `
                     -ChildPath $FunctionApp
 
 $InvokeCrankCommandWithArgs =
