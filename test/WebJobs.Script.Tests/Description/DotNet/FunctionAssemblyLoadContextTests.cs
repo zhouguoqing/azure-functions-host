@@ -3,16 +3,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using Microsoft.Azure.WebJobs.Script.Description;
-using Microsoft.Azure.WebJobs.Script.Extensibility;
-using Microsoft.Azure.WebJobs.Script.WebHost.DependencyInjection;
-using Microsoft.Extensions.DependencyModel;
-using Moq;
 using Xunit;
 
 namespace Microsoft.Azure.WebJobs.Script.Tests
@@ -41,6 +36,28 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
             Assert.Same(AssemblyLoadContext.Default, AssemblyLoadContext.GetLoadContext(assembly));
         }
 
+        [Theory]
+        [InlineData("Microsoft.Azure.WebJobs, Version=3.0.0.0")]
+        public void RuntimeAssemblies_WithHigherVersionInDeps_AreLoadedInFunctionContext(string assemblyName)
+        {
+            string destDeps = Path.Combine(AppContext.BaseDirectory, DotNetConstants.FunctionsDepsFileName);
+            try
+            {
+                string depsPath = Path.Combine(Directory.GetCurrentDirectory(), "Description", "DotNet", "TestFiles", "DepsFiles", DotNetConstants.FunctionsDepsFileName);
+                File.Copy(depsPath, destDeps);
+                var functionContext = new FunctionAssemblyLoadContext(AppContext.BaseDirectory);
+            }
+            finally
+            {
+                if (File.Exists(destDeps))
+                {
+                    File.Delete(destDeps);
+                }
+
+                Assert.NotNull(assemblyName);
+            }
+        }
+
         [Fact]
         public void InitializeDeps_LoadsExpectedDependencies()
         {
@@ -53,15 +70,15 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
             string testRid = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "win" : "unix";
 
             // Ensure runtime specific dependencies are resolved, with appropriate RID
-            FunctionAssemblyLoadContext.TryGetDepsAsset(depsAssemblies, "System.private.servicemodel", currentRidFallbacks, out string assemblyPath);
-            Assert.Equal($"runtimes/{testRid}/lib/netstandard2.0/System.Private.ServiceModel.dll", assemblyPath);
+            FunctionAssemblyLoadContext.TryGetDepsAsset(depsAssemblies, "System.private.servicemodel", currentRidFallbacks, out RuntimeAsset asset);
+            Assert.Equal($"runtimes/{testRid}/lib/netstandard2.0/System.Private.ServiceModel.dll", asset.Path);
 
-            FunctionAssemblyLoadContext.TryGetDepsAsset(depsAssemblies, "System.text.encoding.codepages", currentRidFallbacks, out assemblyPath);
-            Assert.Equal($"runtimes/{testRid}/lib/netstandard1.3/System.Text.Encoding.CodePages.dll", assemblyPath);
+            FunctionAssemblyLoadContext.TryGetDepsAsset(depsAssemblies, "System.text.encoding.codepages", currentRidFallbacks, out asset);
+            Assert.Equal($"runtimes/{testRid}/lib/netstandard1.3/System.Text.Encoding.CodePages.dll", asset.Path);
 
             // Ensure flattened dependency has expected path
-            FunctionAssemblyLoadContext.TryGetDepsAsset(depsAssemblies, "Microsoft.Azure.WebJobs.Host.Storage", currentRidFallbacks, out assemblyPath);
-            Assert.Equal($"Microsoft.Azure.WebJobs.Host.Storage.dll", assemblyPath);
+            FunctionAssemblyLoadContext.TryGetDepsAsset(depsAssemblies, "Microsoft.Azure.WebJobs.Host.Storage", currentRidFallbacks, out asset);
+            Assert.Equal($"Microsoft.Azure.WebJobs.Host.Storage.dll", asset.Path);
 
             // Ensure native libraries are resolved, with appropriate RID and path
             string nativeRid;
@@ -92,8 +109,8 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
 
             string nativeAssetFileName = $"{nativePrefix}CpuMathNative.{nativeExtension}";
 
-            FunctionAssemblyLoadContext.TryGetDepsAsset(nativeLibraries, nativeAssetFileName, currentRidFallbacks, out string assetPath);
-            Assert.Contains($"runtimes/{nativeRid}/nativeassets/netstandard2.0/{nativeAssetFileName}", assetPath);
+            FunctionAssemblyLoadContext.TryGetDepsAsset(nativeLibraries, nativeAssetFileName, currentRidFallbacks, out asset);
+            Assert.Contains($"runtimes/{nativeRid}/nativeassets/netstandard2.0/{nativeAssetFileName}", asset.Path);
         }
 
         [Theory]
@@ -113,13 +130,18 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
 
             string nativeAssetFileName = $"{prefix}Cosmos.CRTCompat.{suffix}";
 
-            FunctionAssemblyLoadContext.TryGetDepsAsset(nativeLibraries, nativeAssetFileName, ridFallback, out string assetPath);
+            bool result = FunctionAssemblyLoadContext.TryGetDepsAsset(nativeLibraries, nativeAssetFileName, ridFallback, out RuntimeAsset asset);
 
-            string expectedMatch = expectMatch
-                ? $"runtimes/{expectedNativeRid}/native/{nativeAssetFileName}"
-                : null;
-
-            Assert.Equal(expectedMatch, assetPath);
+            if (expectMatch)
+            {
+                Assert.True(result);
+                Assert.Equal($"runtimes/{expectedNativeRid}/native/{nativeAssetFileName}", asset.Path);
+            }
+            else
+            {
+                Assert.False(result);
+                Assert.Null(asset);
+            }
         }
     }
 }

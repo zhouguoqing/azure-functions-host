@@ -9,7 +9,6 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
-using System.Threading;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.Script.Config;
 using Microsoft.Extensions.DependencyModel;
@@ -97,12 +96,12 @@ namespace Microsoft.Azure.WebJobs.Script.Description
                 var assemblyGroup = runtimeAssemblyGroups.FirstOrDefault(g => string.Equals(g.Runtime, rid, StringComparison.OrdinalIgnoreCase));
                 if (assemblyGroup != null)
                 {
-                    return assemblyGroup.AssetPaths.Select(path => new RuntimeAsset(rid, path));
+                    return assemblyGroup.RuntimeFiles.Select(file => new RuntimeAsset(rid, file.Path, file.AssemblyVersion));
                 }
             }
 
             // If unsuccessful, load default assets, making sure the path is flattened to reflect deployed files
-            return runtimeAssemblyGroups.GetDefaultAssets().Select(a => new RuntimeAsset(null, Path.GetFileName(a)));
+            return runtimeAssemblyGroups.GetDefaultRuntimeFileAssets().Select(a => new RuntimeAsset(null, Path.GetFileName(a.Path), a.AssemblyVersion));
         }
 
         private static FunctionAssemblyLoadContext CreateSharedContext()
@@ -235,9 +234,29 @@ namespace Microsoft.Azure.WebJobs.Script.Description
             {
                 var policyEvaluator = GetResolutionPolicyEvaluator(scriptRuntimeAssembly.ResolutionPolicy);
 
-                if (policyEvaluator.Invoke(assemblyName, assembly))
+                // It's possible for references to depend on different versions, and deps.json is the
+                // source of truth for which version should be resolved.
+                AssemblyName adjustedName = assemblyName;
+                if (TryGetDepsAsset(_depsAssemblies, assemblyName.Name, _currentRidFallback, out RuntimeAsset asset)
+                    && asset.AssemblyVersion != assemblyName.Version)
+                {
+                    adjustedName = new AssemblyName
+                    {
+                        Name = assemblyName.Name,
+                        Version = asset.AssemblyVersion
+                    };
+                }
+
+                if (policyEvaluator.Invoke(adjustedName, assembly))
                 {
                     return assembly;
+                }
+                else if (adjustedName.Version != assemblyName.Version)
+                {
+                    // We have a runtime assembly with a version that we've had to adjust and this adjustmenet
+                    // caused the policy evaluator to fail. This means we cannot allow the Default context to load
+                    // this Assembly as it will load the one that does not match deps.
+                    return LoadCore(adjustedName);
                 }
             }
 
@@ -250,11 +269,11 @@ namespace Microsoft.Azure.WebJobs.Script.Description
 
             if (_depsAssemblies != null &&
                 !IsRuntimeAssembly(assemblyName) &&
-                TryGetDepsAsset(_depsAssemblies, assemblyName.Name, _currentRidFallback, out string assemblyPath))
+                TryGetDepsAsset(_depsAssemblies, assemblyName.Name, _currentRidFallback, out RuntimeAsset asset))
             {
                 foreach (var probingPath in _probingPaths)
                 {
-                    string filePath = Path.Combine(probingPath, assemblyPath);
+                    string filePath = Path.Combine(probingPath, asset.Path);
                     if (File.Exists(filePath))
                     {
                         assembly = LoadFromAssemblyPath(filePath);
@@ -266,16 +285,16 @@ namespace Microsoft.Azure.WebJobs.Script.Description
             return assembly != null;
         }
 
-        internal static bool TryGetDepsAsset(IDictionary<string, RuntimeAsset[]> depsAssets, string assetName, List<string> ridFallbacks, out string assemblyPath)
+        internal static bool TryGetDepsAsset(IDictionary<string, RuntimeAsset[]> depsAssets, string assetName, List<string> ridFallbacks, out RuntimeAsset asset)
         {
-            assemblyPath = null;
+            asset = null;
 
-            if (depsAssets.TryGetValue(assetName, out RuntimeAsset[] assets))
+            if (depsAssets != null && depsAssets.TryGetValue(assetName, out RuntimeAsset[] assets))
             {
                 // If we have a single asset match, return it:
                 if (assets.Length == 1)
                 {
-                    assemblyPath = assets[0].Path;
+                    asset = assets[0];
                 }
                 else
                 {
@@ -285,21 +304,21 @@ namespace Microsoft.Azure.WebJobs.Script.Description
 
                         if (match != null)
                         {
-                            assemblyPath = match.Path;
+                            asset = match;
                             break;
                         }
                     }
 
                     // If we're unable to locate a matching asset based on the RID fallback probing,
                     // attempt to use a default/RID-agnostic asset instead
-                    if (assemblyPath == null)
+                    if (asset == null)
                     {
-                        assemblyPath = assets.FirstOrDefault(a => a.Rid == null)?.Path;
+                        asset = assets.FirstOrDefault(a => a.Rid == null);
                     }
                 }
             }
 
-            return assemblyPath != null;
+            return asset != null;
         }
 
         private bool TryLoadHostEnvironmentAssembly(AssemblyName assemblyName, bool allowPartialNameMatch, out Assembly assembly)
@@ -388,9 +407,9 @@ namespace Microsoft.Azure.WebJobs.Script.Description
 
             if (result == null && _nativeLibraries != null)
             {
-                if (TryGetDepsAsset(_nativeLibraries, assetFileName, _currentRidFallback, out string relativePath))
+                if (TryGetDepsAsset(_nativeLibraries, assetFileName, _currentRidFallback, out RuntimeAsset asset))
                 {
-                    string nativeLibraryFullPath = Path.Combine(basePath, relativePath);
+                    string nativeLibraryFullPath = Path.Combine(basePath, asset.Path);
                     if (File.Exists(nativeLibraryFullPath))
                     {
                         result = nativeLibraryFullPath;
