@@ -53,11 +53,15 @@ $crankConfigPath = Join-Path `
                     -Path (Split-Path $PSCommandPath -Parent) `
                     -ChildPath 'benchmarks.yml'
 
+$functionAppPath = Join-Path `
+                    -Path 'C:\FunctionApps' `
+                    -ChildPath $FunctionApp
+
 $InvokeCrankCommandWithArgs =
     "$InvokeCrankCommand --config $crankConfigPath" +
     " --scenario functionApp --profile local" +
     " --variable CrankAgentVm=$CrankAgentVm" +
-    " --variable FunctionApp=$FunctionApp" +
+    " --variable FunctionAppPath=`"$functionAppPath`"" +
     " --variable FunctionsHostBranchOrCommit=$FunctionsHostBranchOrCommit"
 
 if ($WriteResultsToDatabase) {
