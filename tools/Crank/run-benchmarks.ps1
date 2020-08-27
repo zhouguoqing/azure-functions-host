@@ -53,15 +53,22 @@ $crankConfigPath = Join-Path `
                     -Path (Split-Path $PSCommandPath -Parent) `
                     -ChildPath 'benchmarks.yml'
 
+$InvokeCrankCommandWithArgs =
+    "$InvokeCrankCommand --config $crankConfigPath" +
+    " --scenario functionApp --profile local" +
+    " --variable CrankAgentVm=$CrankAgentVm" +
+    " --variable FunctionApp=$FunctionApp" +
+    " --variable FunctionsHostBranchOrCommit=$FunctionsHostBranchOrCommit"
+
 if ($WriteResultsToDatabase) {
     Set-AzContext -Subscription 'Antares-Demo' > $null
     $sqlPassword = (Get-AzKeyVaultSecret -vaultName 'functions-crank-kv' -name 'SqlAdminPassword').SecretValueText
 
     $sqlConnectionString = "Server=tcp:functions-crank-sql.database.windows.net,1433;Initial Catalog=functions-crank-db;Persist Security Info=False;User ID=Functions;Password=$sqlPassword;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
 
-    & $InvokeCrankCommand --config $crankConfigPath --scenario functionApp --profile local --variable CrankAgentVm=$CrankAgentVm --variable FunctionApp=$FunctionApp --variable FunctionsHostBranchOrCommit=$FunctionsHostBranchOrCommit --sql $sqlConnectionString --table FunctionsPerf
-} else {
-    & $InvokeCrankCommand --config $crankConfigPath --scenario functionApp --profile local --variable CrankAgentVm=$CrankAgentVm --variable FunctionApp=$FunctionApp --variable FunctionsHostBranchOrCommit=$FunctionsHostBranchOrCommit
+    $InvokeCrankCommandWithArgs += " --sql $sqlConnectionString --table FunctionsPerf"
 }
+
+Invoke-Expression $InvokeCrankCommandWithArgs
 
 #endregion
