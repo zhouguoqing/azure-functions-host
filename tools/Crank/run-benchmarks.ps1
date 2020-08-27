@@ -53,7 +53,7 @@ $crankConfigPath = Join-Path `
                     -Path (Split-Path $PSCommandPath -Parent) `
                     -ChildPath 'benchmarks.yml'
 
-$isLinuxApp = $CrankAgentVm -match '^functions-crank-linux\.'
+$isLinuxApp = $CrankAgentVm -match '\blinux\b'
 
 $functionAppRootPath = $isLinuxApp ? '/home/Functions/FunctionApps' : 'C:\FunctionApps';
                     
