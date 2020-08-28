@@ -32,28 +32,34 @@ function InstallCrankAgent {
 }
 
 function ScheduleCrankAgentStartWindows($RunScriptPath, [pscredential]$Credential) {
-    $action = New-ScheduledTaskAction -Execute 'pwsh.exe' `
-                  -Argument "-NoProfile -WindowStyle Hidden -File $RunScriptPath"
+    $taskName = 'CrankAgent'
 
-    $trigger = New-ScheduledTaskTrigger -AtStartup
+    if (Get-ScheduledTask -TaskName $taskName) {
+        Write-Warning "Task '$taskName' already exists, no changes performed"
+    } else {
+        $action = New-ScheduledTaskAction -Execute 'pwsh.exe' `
+                    -Argument "-NoProfile -WindowStyle Hidden -File $RunScriptPath"
 
-    $auth =
-        if ($Credential) {
-            @{
-                User = $Credential.UserName
-                Password = $Credential.GetNetworkCredential().Password
+        $trigger = New-ScheduledTaskTrigger -AtStartup
+
+        $auth =
+            if ($Credential) {
+                @{
+                    User = $Credential.UserName
+                    Password = $Credential.GetNetworkCredential().Password
+                }
+            } else {
+                @{
+                    Principal = New-ScheduledTaskPrincipal -UserID "NT AUTHORITY\NETWORKSERVICE" `
+                                    -LogonType ServiceAccount -RunLevel Highest
+                }
             }
-        } else {
-            @{
-                Principal = New-ScheduledTaskPrincipal -UserID "NT AUTHORITY\NETWORKSERVICE" `
-                                -LogonType ServiceAccount -RunLevel Highest
-            }
-        }
 
-    $null = Register-ScheduledTask `
-                -TaskName "CrankAgent" -Description "Start crank-agent" `
-                -Action $action -Trigger $trigger `
-                @auth
+        $null = Register-ScheduledTask `
+                    -TaskName $taskName -Description "Start crank-agent" `
+                    -Action $action -Trigger $trigger `
+                    @auth
+    }
 }
 
 function ScheduleCrankAgentStartLinux($RunScriptPath) {
