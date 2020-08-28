@@ -28,18 +28,9 @@ function InstallCrankAgent {
     }
 }
 
-function ScheduleCrankAgentStart([pscredential]$Credential) {
-    $logsDir = 'C:\crank-agent-logs'
-    if (-not (Test-Path $logsDir -PathType Container)) {
-        New-Item -Path $logsDir -ItemType Container
-    }
-
-    $runCrankAgentScriptPath = Join-Path `
-                                    -Path (Split-Path $PSCommandPath -Parent) `
-                                    -ChildPath 'run-crank-agent.ps1'
-
+function ScheduleCrankAgentStartWindows($RunScriptPath, [pscredential]$Credential) {
     $action = New-ScheduledTaskAction -Execute 'pwsh.exe' `
-                  -Argument "-NoProfile -WindowStyle Hidden -File $runCrankAgentScriptPath"
+                  -Argument "-NoProfile -WindowStyle Hidden -File $RunScriptPath"
 
     $trigger = New-ScheduledTaskTrigger -AtStartup
 
@@ -62,12 +53,29 @@ function ScheduleCrankAgentStart([pscredential]$Credential) {
                 @auth
 }
 
+function ScheduleCrankAgentStartLinux($RunScriptPath) {
+    $currentCrontabContent = (crontab -l) ?? $null
+    if (-not ($currentCrontabContent -match '\bcrank-agent\b')) {
+        $currentCrontabContent, "@reboot $RunScriptPath" | crontab -
+    }
+}
+
+function ScheduleCrankAgentStart {
+    $scriptPath = Join-Path -Path (Split-Path $PSCommandPath -Parent) -ChildPath 'run-crank-agent.ps1'
+
+    if ($IsWindows) {
+        ScheduleCrankAgentStartWindows -RunScriptPath $scriptPath -Credential (Get-Credential)
+    } else {
+        ScheduleCrankAgentStartLinux -RunScriptPath $scriptPath
+    }
+}
+
 #endregion
 
 #region Main
 
 if ($InstallDotNet) { InstallDotNet }
 if ($InstallCrankAgent) { InstallCrankAgent }
-ScheduleCrankAgentStart -Credential (Get-Credential)
+ScheduleCrankAgentStart
 
 #endregion
