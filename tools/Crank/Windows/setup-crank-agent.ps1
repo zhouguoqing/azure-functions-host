@@ -8,8 +8,16 @@ $ErrorActionPreference = 'Stop'
 #region Utilities
 
 function InstallDotNet {
-    Invoke-WebRequest 'https://raw.githubusercontent.com/dotnet/cli/master/scripts/obtain/dotnet-install.ps1' -OutFile 'dotnet-install.ps1'
-    ./dotnet-install.ps1
+    if ($IsWindows) {
+        Invoke-WebRequest 'https://raw.githubusercontent.com/dotnet/cli/master/scripts/obtain/dotnet-install.ps1' -OutFile 'dotnet-install.ps1'
+        ./dotnet-install.ps1
+    } else {
+        # From https://docs.microsoft.com/dotnet/core/install/linux-ubuntu#install-the-sdk
+        sudo apt-get update
+        sudo apt-get install -y apt-transport-https
+        sudo apt-get update
+        sudo apt-get install -y dotnet-sdk-3.1
+    }
 }
 
 function InstallCrankAgent {
