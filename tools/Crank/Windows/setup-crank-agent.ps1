@@ -21,7 +21,11 @@ function InstallDotNet {
 }
 
 function InstallCrankAgent {
-    dotnet tool install --tool-path c:\dotnet-tools Microsoft.Crank.Agent --version "0.1.0-*"
+    if ($IsWindows) {
+        dotnet tool install --tool-path c:\dotnet-tools Microsoft.Crank.Agent --version "0.1.0-*"
+    } else {
+        dotnet tool install -g Microsoft.Crank.Agent --version "0.1.0-*"
+    }
 }
 
 function ScheduleCrankAgentStart([pscredential]$Credential) {
