@@ -55,11 +55,22 @@ jobs:
       packageType: 'sdk'
       version: '3.1.x'
       performMultiLevelLookup: true
+
+  - pwsh: |
+      $integrationTestsBuild = $null
+      if (-not ([bool]::TryParse($env:INTEGRATIONTESTSBUILD, [ref] $integrationTestsBuild)))
+      {
+        throw "integrationTestsBuild can only be set to True or False. Current value is set to $env:INTEGRATIONTESTSBUILD"
+      }
+      Write-Host "##vso[task.setvariable variable=UploadPackage]$integrationTestsBuild"
+      Write-Host "integrationTestsBuild: $integrationTestsBuild"
+    displayName: 'Set IntegrationTestsBuild variable'
+
   - task: PowerShell@2
     displayName: "Build artifacts"
     inputs:
       filePath: '$(Build.Repository.LocalPath)\build\build-extensions.ps1'
-      arguments: '-buildNumber "$(buildNumber)" -suffix "$(suffix)" -commitHash "$(Build.SourceVersion)"'
+      arguments: '-buildNumber "$(buildNumber)" -suffix "$(suffix)" -commitHash "$(Build.SourceVersion)" -integrationTestsBuild:$integrationTestsBuild'
   - task: CopyFiles@2
     inputs:
       SourceFolder: '$(Build.Repository.LocalPath)\buildoutput'
