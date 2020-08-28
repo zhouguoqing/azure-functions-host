@@ -38,7 +38,7 @@ function ScheduleCrankAgentStart([pscredential]$Credential) {
                                     -Path (Split-Path $PSCommandPath -Parent) `
                                     -ChildPath 'run-crank-agent.ps1'
 
-    $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
+    $action = New-ScheduledTaskAction -Execute 'pwsh.exe' `
                   -Argument "-NoProfile -WindowStyle Hidden -File $runCrankAgentScriptPath"
 
     $trigger = New-ScheduledTaskTrigger -AtStartup
