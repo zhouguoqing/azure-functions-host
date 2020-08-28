@@ -1,4 +1,4 @@
-params (
+param (
     [bool]$InstallDotNet = $true,
     [bool]$InstallCrankAgent = $true
 )
