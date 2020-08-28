@@ -64,11 +64,12 @@ $functionAppPath = Join-Path `
                     -ChildPath $FunctionApp
 
 $crankArgs =
-    "--config $crankConfigPath " +
-    "--scenario functionApp --profile local " +
-    "--variable CrankAgentVm=$CrankAgentVm " +
-    "--variable FunctionAppPath=`"$functionAppPath`" " +
-    "--variable FunctionsHostBranchOrCommit=$FunctionsHostBranchOrCommit"
+    '--config', $crankConfigPath,
+    '--scenario', 'functionApp',
+    '--profile', 'local',
+    '--variable', "CrankAgentVm=$CrankAgentVm",
+    '--variable', "FunctionAppPath=`"$functionAppPath`"",
+    '--variable', "FunctionsHostBranchOrCommit=$FunctionsHostBranchOrCommit"
 
 if ($WriteResultsToDatabase) {
     Set-AzContext -Subscription 'Antares-Demo' > $null
@@ -76,7 +77,8 @@ if ($WriteResultsToDatabase) {
 
     $sqlConnectionString = "Server=tcp:functions-crank-sql.database.windows.net,1433;Initial Catalog=functions-crank-db;Persist Security Info=False;User ID=Functions;Password=$sqlPassword;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
 
-    $crankArgs += " --sql $sqlConnectionString --table FunctionsPerf"
+    $crankArgs += '--sql', $sqlConnectionString
+    $crankArgs += '--table', 'FunctionsPerf'
 }
 
 & $InvokeCrankCommand $crankArgs

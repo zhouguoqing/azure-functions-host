@@ -10,7 +10,7 @@ if ($IsWindows) {
 
 $logsDir = $IsWindows ? 'C:\crank-agent-logs' : '/home/Functions/crank-agent-logs'
 if (-not (Test-Path $logsDir -PathType Container)) {
-    New-Item -Path $logsDir -ItemType Container
+    New-Item -Path $logsDir -ItemType Container > $null
 }
 
 $logFileName = Join-Path -Path $logsDir -ChildPath "$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').log"
