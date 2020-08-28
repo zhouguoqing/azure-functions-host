@@ -1,5 +1,3 @@
-#!/usr/bin/pwsh
-
 $ErrorActionPreference = 'Stop'
 
 if ($IsWindows) {

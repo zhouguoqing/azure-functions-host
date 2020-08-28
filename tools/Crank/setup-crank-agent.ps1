@@ -1,5 +1,3 @@
-#!/usr/bin/pwsh
-
 param (
     [bool]$InstallDotNet = $true,
     [bool]$InstallCrankAgent = $true
