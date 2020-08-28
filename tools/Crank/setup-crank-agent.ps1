@@ -1,3 +1,4 @@
+[CmdletBinding()]
 param (
     [bool]$InstallDotNet = $true,
     [bool]$InstallCrankAgent = $true
@@ -8,6 +9,7 @@ $ErrorActionPreference = 'Stop'
 #region Utilities
 
 function InstallDotNet {
+    Write-Verbose 'Installing dotnet...'
     if ($IsWindows) {
         Invoke-WebRequest 'https://raw.githubusercontent.com/dotnet/cli/master/scripts/obtain/dotnet-install.ps1' -OutFile 'dotnet-install.ps1'
         ./dotnet-install.ps1
@@ -21,6 +23,7 @@ function InstallDotNet {
 }
 
 function InstallCrankAgent {
+    Write-Verbose 'Installing crank-agent...'
     if ($IsWindows) {
         dotnet tool install --tool-path c:\dotnet-tools Microsoft.Crank.Agent --version "0.1.0-*"
     } else {
@@ -63,6 +66,8 @@ function ScheduleCrankAgentStartLinux($RunScriptPath) {
 }
 
 function ScheduleCrankAgentStart {
+    Write-Verbose 'Scheduling crank-agent start...'
+
     $scriptPath = Join-Path -Path (Split-Path $PSCommandPath -Parent) -ChildPath 'run-crank-agent.ps1'
 
     if ($IsWindows) {
@@ -70,6 +75,8 @@ function ScheduleCrankAgentStart {
     } else {
         ScheduleCrankAgentStartLinux -RunScriptPath $scriptPath
     }
+
+    Write-Warning 'Please reboot to start crank-agent'
 }
 
 #endregion
