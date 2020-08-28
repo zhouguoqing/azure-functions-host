@@ -55,7 +55,9 @@ function ScheduleCrankAgentStartWindows($RunScriptPath, [pscredential]$Credentia
 
 function ScheduleCrankAgentStartLinux($RunScriptPath) {
     $currentCrontabContent = (crontab -l) ?? $null
-    if (-not ($currentCrontabContent -match '\bcrank-agent\b')) {
+    if ($currentCrontabContent -match '\bcrank-agent\b') {
+        Write-Warning "crank-agent reference is found in crontab, no changes performed"
+    } else {
         $currentCrontabContent, "@reboot $RunScriptPath" | crontab -
     }
 }
