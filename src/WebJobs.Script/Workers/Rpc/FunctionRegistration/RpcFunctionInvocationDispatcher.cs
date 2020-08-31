@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Azure.Storage.Shared.Protocol;
 using Microsoft.Azure.WebJobs.Script.Description;
 using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Azure.WebJobs.Script.Eventing;
@@ -164,7 +165,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
                 return;
             }
 
-            _workerRuntime = _workerRuntime ?? Utility.GetWorkerRuntime(functions);
+            //_workerRuntime = _workerRuntime ?? Utility.GetWorkerRuntime(functions);
+            _workerRuntime = Environment.GetEnvironmentVariable(RpcWorkerConstants.FunctionWorkerRuntimeSettingName);
             _functions = functions;
             if (string.IsNullOrEmpty(_workerRuntime) || _workerRuntime.Equals(RpcWorkerConstants.DotNetLanguageWorkerName, StringComparison.InvariantCultureIgnoreCase))
             {
@@ -175,11 +177,11 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
                 return;
             }
 
-            if (functions == null || functions.Count() == 0)
-            {
-                // do not initialize function dispatcher if there are no functions
-                return;
-            }
+            //if (functions == null || functions.Count() == 0)
+            //{
+            //    // do not initialize function dispatcher if there are no functions
+            //    return;
+            //}
 
             if (Utility.IsSupportedRuntime(_workerRuntime, _workerConfigs))
             {

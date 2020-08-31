@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -19,6 +20,7 @@ using Microsoft.Azure.WebJobs.Script.Grpc.Messages;
 using Microsoft.Azure.WebJobs.Script.ManagedDependencies;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json.Linq;
 using static Microsoft.Azure.WebJobs.Script.Grpc.Messages.RpcLog.Types;
 using FunctionMetadata = Microsoft.Azure.WebJobs.Script.Description.FunctionMetadata;
 using MsgType = Microsoft.Azure.WebJobs.Script.Grpc.Messages.StreamingMessage.ContentOneofCase;
@@ -28,6 +30,9 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
     internal class RpcWorkerChannel : IRpcWorkerChannel, IDisposable
     {
         private readonly TimeSpan workerInitTimeout = TimeSpan.FromSeconds(30);
+
+        // TODO: FIX THIS!!! FREEZING START
+        private readonly TimeSpan functionIndexTimeout = TimeSpan.FromSeconds(30);
         private readonly IScriptEventManager _eventManager;
         private readonly RpcWorkerConfig _workerConfig;
         private readonly string _runtime;
@@ -57,6 +62,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         private IWorkerProcess _rpcWorkerProcess;
         private TaskCompletionSource<bool> _reloadTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private TaskCompletionSource<bool> _workerInitTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private TaskCompletionSource<IList<FunctionMetadata>> _functionsIndexingTask = new TaskCompletionSource<IList<FunctionMetadata>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         internal RpcWorkerChannel(
            string workerId,
@@ -223,6 +229,70 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
             latencyEvent.Dispose();
         }
 
+        internal void SendFunctionIndexRequest()
+        {
+            _workerChannelLogger.LogDebug("Requesting worker to load functions.");
+            _inboundWorkerEvents.Where(msg => msg.MessageType == MsgType.FunctionsIndexResponse)
+                .Timeout(functionIndexTimeout)
+                .Take(1)
+                .Subscribe(WorkerFunctionIndexReponse, HandleWorkerFunctionIndexError);
+
+            FunctionsIndexRequest functionsIndexRequest = GetFunctionsIndexRequest();
+
+            SendStreamingMessage(new StreamingMessage
+            {
+                FunctionsIndexRequest = functionsIndexRequest
+            });
+        }
+
+        internal FunctionsIndexRequest GetFunctionsIndexRequest()
+        {
+            return new FunctionsIndexRequest
+            {
+                FunctionsDirectory = "TODO:"
+            };
+        }
+
+        internal void WorkerFunctionIndexReponse(RpcEvent functionsIndexEvent)
+        {
+            _workerChannelLogger.LogDebug("Received FunctionsIndexresponse.");
+            var functionsIndexResponse = functionsIndexEvent.Message.FunctionsIndexResponse;
+
+            IList<FunctionMetadata> functions = new List<FunctionMetadata>();
+
+            foreach (var rpcMetadata in functionsIndexResponse.FunctionsMetadata)
+            {
+                var functionMetadata = new FunctionMetadata()
+                {
+                    EntryPoint = rpcMetadata.EntryPoint,
+                    Name = rpcMetadata.Name,
+                    ScriptFile = rpcMetadata.ScriptFile,
+                    FunctionDirectory = rpcMetadata.FunctionDirectory,
+                    Language = rpcMetadata.Language
+                };
+
+                foreach (var rpcBinding in rpcMetadata.BindingMetadata)
+                {
+                    var functionBinding = new BindingMetadata()
+                    {
+                        Connection = rpcBinding.Connection,
+                        Direction = (BindingDirection)rpcBinding.Direction,
+                        DataType = (DataType?)rpcBinding.DataType,
+                        Cardinality = (Cardinality?)rpcBinding.Cardinality,
+                        Type = rpcBinding.Type,
+                        Name = rpcBinding.Name
+                    };
+
+                    functionBinding.Raw = JObject.FromObject(functionBinding);
+                    functionMetadata.Bindings.Add(functionBinding);
+                }
+
+                functions.Add(functionMetadata);
+            }
+
+            _functionsIndexingTask.SetResult(functions);
+        }
+
         internal void WorkerInitResponse(RpcEvent initEvent)
         {
             _startLatencyMetric?.Dispose();
@@ -240,6 +310,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
             _state = _state | RpcWorkerChannelState.Initialized;
             _workerCapabilities.UpdateCapabilities(_initMessage.Capabilities);
             _workerInitTask.SetResult(true);
+
+            SendFunctionIndexRequest();
         }
 
         public void SetupFunctionInvocationBuffers(IEnumerable<FunctionMetadata> functions)
@@ -505,6 +577,14 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         internal void HandleWorkerInitError(Exception exc)
         {
             _workerChannelLogger.LogError(exc, "Initializing worker process failed");
+            PublishWorkerErrorEvent(exc);
+        }
+
+        internal void HandleWorkerFunctionIndexError(Exception exc)
+        {
+            _workerChannelLogger.LogError(exc, "Indexing functions from worker failed");
+
+            // TODO: update
             PublishWorkerErrorEvent(exc);
         }
 
