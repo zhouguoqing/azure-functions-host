@@ -273,10 +273,22 @@ namespace Microsoft.Azure.WebJobs.Script
                 PreInitialize();
                 HostInitializing?.Invoke(this, EventArgs.Empty);
 
-                // Generate Functions
-                IEnumerable<FunctionMetadata> functionMetadataList = GetFunctionsMetadata();
+                // Initialize worker function invocation dispatcher only for valid functions after creating function descriptors
+                // Dispatcher not needed for non-proxy codeless function.
 
-                _workerRuntime = _workerRuntime ?? Utility.GetWorkerRuntime(functionMetadataList);
+                (IEnumerable<FunctionMetadata> freshMetadata, bool loadedByWorker) = await _functionDispatcher.InitializeAsync(
+                    async () => await LoadFunctionMetadataFromHost(cancellationToken), cancellationToken);
+
+                // If these functions were loaded by the worker, we now need to load it to the FunctionMetadata
+                // and initialize the descriptors
+                if (loadedByWorker)
+                {
+                    _functionMetadataManager.OverwriteInternalFunctionMetadata(freshMetadata.ToList());
+                    await InitializeFunctionDescriptorsAsync(freshMetadata, cancellationToken);
+                }
+
+                // Generate Functions
+                _workerRuntime = _workerRuntime ?? Utility.GetWorkerRuntime(freshMetadata);
 
                 if (!_environment.IsPlaceholderModeEnabled())
                 {
@@ -297,18 +309,22 @@ namespace Microsoft.Azure.WebJobs.Script
                     _metricsLogger.LogEvent(string.Format(MetricEventNames.HostStartupRuntimeLanguage, runtimeStack));
                 }
 
-                var directTypes = GetDirectTypes(functionMetadataList);
-                await InitializeFunctionDescriptorsAsync(functionMetadataList, cancellationToken);
-
-                // Initialize worker function invocation dispatcher only for valid functions after creating function descriptors
-                // Dispatcher not needed for non-proxy codeless function.
-                var filteredFunctionMetadata = functionMetadataList.Where(m => m.IsProxy() || !m.IsCodeless());
-                await _functionDispatcher.InitializeAsync(Utility.GetValidFunctions(filteredFunctionMetadata, Functions), cancellationToken);
-
+                var directTypes = GetDirectTypes(_functionMetadataManager.GetFunctionMetadata());
                 GenerateFunctions(directTypes);
 
                 ScheduleFileSystemCleanup();
             }
+        }
+
+        private async Task<IEnumerable<FunctionMetadata>> LoadFunctionMetadataFromHost(CancellationToken cancellationToken)
+        {
+            IEnumerable<FunctionMetadata> functionMetadataList = GetFunctionsMetadata();
+            await InitializeFunctionDescriptorsAsync(functionMetadataList, cancellationToken);
+
+            // Initialize worker function invocation dispatcher only for valid functions after creating function descriptors
+            // Dispatcher not needed for non-proxy codeless function.
+            var filteredFunctionMetadata = functionMetadataList.Where(m => m.IsProxy() || !m.IsCodeless());
+            return Utility.GetValidFunctions(filteredFunctionMetadata, Functions);
         }
 
         private async Task LogInitializationAsync()

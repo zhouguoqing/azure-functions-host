@@ -5,7 +5,6 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -32,7 +31,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         private readonly TimeSpan workerInitTimeout = TimeSpan.FromSeconds(30);
 
         // TODO: FIX THIS!!! FREEZING START
-        private readonly TimeSpan functionIndexTimeout = TimeSpan.FromSeconds(30);
+        private readonly TimeSpan functionIndexTimeout = TimeSpan.FromSeconds(7);
         private readonly IScriptEventManager _eventManager;
         private readonly RpcWorkerConfig _workerConfig;
         private readonly string _runtime;
@@ -62,7 +61,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         private IWorkerProcess _rpcWorkerProcess;
         private TaskCompletionSource<bool> _reloadTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private TaskCompletionSource<bool> _workerInitTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        private TaskCompletionSource<IList<FunctionMetadata>> _functionsIndexingTask = new TaskCompletionSource<IList<FunctionMetadata>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private TaskCompletionSource<List<FunctionMetadata>> _functionsIndexingTask = new TaskCompletionSource<List<FunctionMetadata>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         internal RpcWorkerChannel(
            string workerId,
@@ -141,6 +140,12 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
             await _rpcWorkerProcess.StartProcessAsync();
             _state = _state | RpcWorkerChannelState.Initializing;
             await _workerInitTask.Task;
+        }
+
+        public Task<List<FunctionMetadata>> GetFunctionMetadata()
+        {
+            SendFunctionIndexRequest();
+            return _functionsIndexingTask.Task;
         }
 
         public async Task<WorkerStatus> GetWorkerStatusAsync()
@@ -227,6 +232,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
             }
             _reloadTask.SetResult(true);
             latencyEvent.Dispose();
+
+            // SendFunctionIndexRequest();
         }
 
         internal void SendFunctionIndexRequest()
@@ -235,7 +242,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
             _inboundWorkerEvents.Where(msg => msg.MessageType == MsgType.FunctionsIndexResponse)
                 .Timeout(functionIndexTimeout)
                 .Take(1)
-                .Subscribe(WorkerFunctionIndexReponse, HandleWorkerFunctionIndexError);
+                .Subscribe(WorkerFunctionIndexResponse, HandleWorkerFunctionIndexError);
 
             FunctionsIndexRequest functionsIndexRequest = GetFunctionsIndexRequest();
 
@@ -249,16 +256,16 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         {
             return new FunctionsIndexRequest
             {
-                FunctionsDirectory = "TODO:"
+                FunctionsDirectory = _applicationHostOptions.CurrentValue.ScriptPath
             };
         }
 
-        internal void WorkerFunctionIndexReponse(RpcEvent functionsIndexEvent)
+        internal void WorkerFunctionIndexResponse(RpcEvent functionsIndexEvent)
         {
             _workerChannelLogger.LogDebug("Received FunctionsIndexresponse.");
             var functionsIndexResponse = functionsIndexEvent.Message.FunctionsIndexResponse;
 
-            IList<FunctionMetadata> functions = new List<FunctionMetadata>();
+            var functions = new List<FunctionMetadata>();
 
             foreach (var rpcMetadata in functionsIndexResponse.FunctionsMetadata)
             {
@@ -310,8 +317,6 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
             _state = _state | RpcWorkerChannelState.Initialized;
             _workerCapabilities.UpdateCapabilities(_initMessage.Capabilities);
             _workerInitTask.SetResult(true);
-
-            SendFunctionIndexRequest();
         }
 
         public void SetupFunctionInvocationBuffers(IEnumerable<FunctionMetadata> functions)
@@ -355,6 +360,9 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
             {
                 FunctionEnvironmentReloadRequest = request
             });
+
+            // Reset functions task as environment has changed
+            // _functionsIndexingTask = new TaskCompletionSource<IList<FunctionMetadata>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             return _reloadTask.Task;
         }
@@ -583,9 +591,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         internal void HandleWorkerFunctionIndexError(Exception exc)
         {
             _workerChannelLogger.LogError(exc, "Indexing functions from worker failed");
-
-            // TODO: update
-            PublishWorkerErrorEvent(exc);
+            _functionsIndexingTask.SetResult(new List<FunctionMetadata>());
         }
 
         private void PublishWorkerErrorEvent(Exception exc)

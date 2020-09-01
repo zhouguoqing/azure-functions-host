@@ -162,7 +162,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Management
         public async Task<(bool, FunctionMetadataResponse)> TryGetFunction(string name, HttpRequest request)
         {
             var hostOptions = _applicationHostOptions.CurrentValue.ToHostOptions();
-            var functionMetadata = GetFunctionsMetadata(includeProxies: false, forceRefresh: true)
+            var functionMetadata = GetFunctionsMetadata(includeProxies: false, forceRefresh: false)
                 .FirstOrDefault(metadata => Utility.FunctionNamesMatch(metadata.Name, name));
 
             if (functionMetadata != null)

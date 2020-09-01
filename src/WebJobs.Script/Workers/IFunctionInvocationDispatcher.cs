@@ -17,7 +17,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers
 
         Task InvokeAsync(ScriptInvocationContext invocationContext);
 
-        Task InitializeAsync(IEnumerable<FunctionMetadata> functions, CancellationToken cancellationToken = default);
+        Task<(IEnumerable<FunctionMetadata>, bool)> InitializeAsync(Func<Task<IEnumerable<FunctionMetadata>>> getHostFunctions,
+            CancellationToken cancellationToken = default);
 
         Task<IDictionary<string, WorkerStatus>> GetWorkerStatusesAsync();
 

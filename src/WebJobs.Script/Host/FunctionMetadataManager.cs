@@ -81,10 +81,21 @@ namespace Microsoft.Azure.WebJobs.Script
         {
             if (forceRefresh || _servicesReset || _functionMetadataArray.IsDefaultOrEmpty)
             {
-                _functionMetadataArray = LoadFunctionMetadata(forceRefresh);
+                _functionMetadataArray = ReadAndLoadFunctionMetadata(forceRefresh);
                 _logger.FunctionMetadataManagerFunctionsLoaded(ApplyAllowList(_functionMetadataArray).Count());
                 _servicesReset = false;
             }
+
+            return applyAllowList ? ApplyAllowList(_functionMetadataArray) : _functionMetadataArray;
+        }
+
+        // TODO: Make sure this also takes in a list of errors to keep track. The errors need to come from the worker itself
+        public ImmutableArray<FunctionMetadata> OverwriteInternalFunctionMetadata(List<FunctionMetadata> functionMetadataList, bool applyAllowList = true)
+        {
+            _functionErrors = new Dictionary<string, ICollection<string>>();
+            _functionMetadataArray = LoadFunctionMetadata(functionMetadataList);
+            _logger.FunctionMetadataManagerFunctionsLoaded(ApplyAllowList(_functionMetadataArray).Count());
+            _servicesReset = false;
 
             return applyAllowList ? ApplyAllowList(_functionMetadataArray) : _functionMetadataArray;
         }
@@ -116,19 +127,12 @@ namespace Microsoft.Azure.WebJobs.Script
             _servicesReset = true;
         }
 
-        /// <summary>
-        /// Read all functions and populate function metadata.
-        /// </summary>
-        internal ImmutableArray<FunctionMetadata> LoadFunctionMetadata(bool forceRefresh = false)
+        internal ImmutableArray<FunctionMetadata> ReadAndLoadFunctionMetadata(bool forceRefresh = false)
         {
-            _functionMetadataMap.Clear();
-
-            ICollection<string> functionsAllowList = _scriptOptions?.Value?.Functions;
-            _logger.FunctionMetadataManagerLoadingFunctionsMetadata();
-
-            var immutableFunctionMetadata = _functionMetadataProvider.GetFunctionMetadata(_languageWorkerOptions.Value.WorkerConfigs, forceRefresh);
             var functionMetadataList = new List<FunctionMetadata>();
             _functionErrors = new Dictionary<string, ICollection<string>>();
+
+            var immutableFunctionMetadata = _functionMetadataProvider.GetFunctionMetadata(_languageWorkerOptions.Value.WorkerConfigs, forceRefresh);
 
             if (!immutableFunctionMetadata.IsDefaultOrEmpty)
             {
@@ -139,6 +143,19 @@ namespace Microsoft.Azure.WebJobs.Script
             {
                 _functionErrors = _functionMetadataProvider.FunctionErrors.ToDictionary(kvp => kvp.Key, kvp => (ICollection<string>)kvp.Value.ToList());
             }
+
+            return LoadFunctionMetadata(functionMetadataList);
+        }
+
+        /// <summary>
+        /// Read all functions and populate function metadata.
+        /// </summary>
+        internal ImmutableArray<FunctionMetadata> LoadFunctionMetadata(List<FunctionMetadata> functionMetadataList)
+        {
+            _functionMetadataMap.Clear();
+
+            ICollection<string> functionsAllowList = _scriptOptions?.Value?.Functions;
+            _logger.FunctionMetadataManagerLoadingFunctionsMetadata();
 
             // Add metadata and errors from any additional function providers
             LoadCustomProviderFunctions(functionMetadataList);

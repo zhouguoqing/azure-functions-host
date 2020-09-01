@@ -81,18 +81,22 @@ namespace Microsoft.Azure.WebJobs.Script.Workers
             _logger.LogInformation("Worker process started and initialized.");
         }
 
-        public async Task InitializeAsync(IEnumerable<FunctionMetadata> functions, CancellationToken cancellationToken = default)
+        public async Task<(IEnumerable<FunctionMetadata>, bool)> InitializeAsync(Func<Task<IEnumerable<FunctionMetadata>>> getHostFunctions,
+            CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            var functions = await getHostFunctions();
             if (functions == null || !functions.Any())
             {
                 // do not initialize function dispachter if there are no functions
-                return;
+                return (functions, false);
             }
 
             State = FunctionInvocationDispatcherState.Initializing;
             await InitializeHttpWorkerChannelAsync(0, cancellationToken);
+
+            return (functions, false);
         }
 
         public Task InvokeAsync(ScriptInvocationContext invocationContext)

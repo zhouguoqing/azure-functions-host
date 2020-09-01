@@ -39,6 +39,7 @@ namespace Microsoft.Azure.WebJobs.Script.DependencyInjection
             _rootScriptPath = rootScriptPath ?? throw new ArgumentNullException(nameof(rootScriptPath));
             _extensionBundleManager = extensionBundleManager ?? throw new ArgumentNullException(nameof(extensionBundleManager));
             _logger = logger;
+            // TODO: Can be removed. Leaving it for experimenting as this is WIP.
             _functionMetadataManager = functionMetadataManager;
             _metricsLogger = metricsLogger;
             _startupTypes = new Lazy<IEnumerable<Type>>(() => GetExtensionsStartupTypesAsync().ConfigureAwait(false).GetAwaiter().GetResult());
@@ -66,25 +67,27 @@ namespace Microsoft.Azure.WebJobs.Script.DependencyInjection
         {
             string binPath;
             FunctionAssemblyLoadContext.ResetSharedContext();
-            var functionMetadataCollection = _functionMetadataManager.GetFunctionMetadata(forceRefresh: true);
-            HashSet<string> bindingsSet = null;
+            // var functionMetadataCollection = _functionMetadataManager.GetFunctionMetadata(forceRefresh: true);
+            // HashSet<string> bindingsSet = null;
             var bundleConfigured = _extensionBundleManager.IsExtensionBundleConfigured();
+
+            // TODO: check if it is actually precompiled. The best way would be "FUNCTIONS_WORKER_RUNTIME" and ".csx"
             bool isPrecompiledFunctionApp = false;
 
-            if (bundleConfigured)
-            {
-                bindingsSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            //if (bundleConfigured)
+            //{
+            //    bindingsSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                // Generate a Hashset of all the binding types used in the function app
-                foreach (var functionMetadata in functionMetadataCollection)
-                {
-                    foreach (var binding in functionMetadata.Bindings)
-                    {
-                        bindingsSet.Add(binding.Type);
-                    }
-                    isPrecompiledFunctionApp = isPrecompiledFunctionApp || functionMetadata.Language == DotNetScriptTypes.DotNetAssembly;
-                }
-            }
+            //    // Generate a Hashset of all the binding types used in the function app
+            //    foreach (var functionMetadata in functionMetadataCollection)
+            //    {
+            //        foreach (var binding in functionMetadata.Bindings)
+            //        {
+            //            bindingsSet.Add(binding.Type);
+            //        }
+            //        isPrecompiledFunctionApp = isPrecompiledFunctionApp || functionMetadata.Language == DotNetScriptTypes.DotNetAssembly;
+            //    }
+            //}
 
             bool isLegacyExtensionBundle = _extensionBundleManager.IsLegacyExtensionBundle();
             if (bundleConfigured && (!isPrecompiledFunctionApp || _extensionBundleManager.IsLegacyExtensionBundle()))
@@ -114,7 +117,10 @@ namespace Microsoft.Azure.WebJobs.Script.DependencyInjection
             {
                 if (!bundleConfigured
                     || extensionItem.Bindings.Count == 0
-                    || extensionItem.Bindings.Intersect(bindingsSet, StringComparer.OrdinalIgnoreCase).Any())
+                    // || extensionItem.Bindings.Intersect(bindingsSet, StringComparer.OrdinalIgnoreCase).Any())
+                    // TODO: We may need to change the scope of the RpcWorkerChannelFactory to keep this opmitization
+                    // I think it's doable. But for the purpose of a proof of concept, we will just load all extensions
+                    || extensionItem.Bindings.Any())
                 {
                     string startupExtensionName = extensionItem.Name ?? extensionItem.TypeName;
                     _logger.ScriptStartUpLoadingStartUpExtension(startupExtensionName);

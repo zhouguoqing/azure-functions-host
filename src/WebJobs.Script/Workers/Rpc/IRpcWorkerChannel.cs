@@ -20,6 +20,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
 
         void SetupFunctionInvocationBuffers(IEnumerable<FunctionMetadata> functions);
 
+        Task<List<FunctionMetadata>> GetFunctionMetadata();
+
         void SendFunctionLoadRequests(ManagedDependencyOptions managedDependencyOptions);
 
         Task SendFunctionEnvironmentReloadRequest();

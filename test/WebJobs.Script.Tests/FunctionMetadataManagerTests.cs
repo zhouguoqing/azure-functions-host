@@ -71,7 +71,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
                 mockFunctionMetadataProvider.Object, new List<IFunctionProvider>(), new OptionsWrapper<HttpWorkerOptions>(_defaultHttpWorkerOptions), MockNullLoggerFactory.CreateLoggerFactory(), new OptionsWrapper<LanguageWorkerOptions>(TestHelpers.GetTestLanguageWorkerOptions()));
 
             managerMock.Raise(m => m.HostInitializing += null, new EventArgs());
-            Assert.Empty(testFunctionMetadataManager.LoadFunctionMetadata());
+            Assert.Empty(testFunctionMetadataManager.ReadAndLoadFunctionMetadata());
 
             Assert.True(testFunctionMetadataManager.Errors.Count == 1);
             ImmutableArray<string> functionErrors = testFunctionMetadataManager.Errors["testFunction"];
@@ -106,7 +106,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
 
             managerMock.Raise(m => m.HostInitializing += null, new EventArgs());
 
-            testFunctionMetadataManager.LoadFunctionMetadata();
+            testFunctionMetadataManager.ReadAndLoadFunctionMetadata();
 
             Assert.Equal(2, testFunctionMetadataManager.Errors.Count);
             ImmutableArray<string> functionErrors = testFunctionMetadataManager.Errors["anotherFunction"];
@@ -152,7 +152,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
 
             FunctionMetadataManager testFunctionMetadataManager = TestFunctionMetadataManager.GetFunctionMetadataManager(new OptionsWrapper<ScriptJobHostOptions>(_scriptJobHostOptions),
                 mockFunctionMetadataProvider.Object, new List<IFunctionProvider>() { mockFunctionProvider.Object }, new OptionsWrapper<HttpWorkerOptions>(_defaultHttpWorkerOptions), MockNullLoggerFactory.CreateLoggerFactory(), new OptionsWrapper<LanguageWorkerOptions>(TestHelpers.GetTestLanguageWorkerOptions()));
-            testFunctionMetadataManager.LoadFunctionMetadata();
+            testFunctionMetadataManager.ReadAndLoadFunctionMetadata();
 
             Assert.Equal(0, testFunctionMetadataManager.Errors.Count);
             Assert.Equal(1, testFunctionMetadataManager.GetFunctionMetadata(true).Length);
@@ -184,7 +184,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests
                 mockFunctionMetadataProvider.Object, new List<IFunctionProvider>() { mockFunctionProvider.Object, mockFunctionProviderDuplicate.Object },
                 new OptionsWrapper<HttpWorkerOptions>(_defaultHttpWorkerOptions), MockNullLoggerFactory.CreateLoggerFactory(), new OptionsWrapper<LanguageWorkerOptions>(TestHelpers.GetTestLanguageWorkerOptions()));
 
-            var ex = Assert.Throws<InvalidOperationException>(() => testFunctionMetadataManager.LoadFunctionMetadata());
+            var ex = Assert.Throws<InvalidOperationException>(() => testFunctionMetadataManager.ReadAndLoadFunctionMetadata());
             Assert.Equal("Found duplicate FunctionMetadata with the name duplicateFunction", ex.Message);
         }
 
