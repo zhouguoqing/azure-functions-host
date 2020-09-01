@@ -100,7 +100,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                 SystemEnvironment.Instance.SetEnvironmentVariable(DataProtectionConstants.AzureWebsiteEnvironmentMachineKey, authEncryptionKey);
             }
 
-            ConfigureMinimumThreads(SystemEnvironment.Instance);
+            //ConfigureMinimumThreads(SystemEnvironment.Instance);
         }
 
         private static void CurrentDomainOnUnhandledException(object sender, UnhandledExceptionEventArgs e)
