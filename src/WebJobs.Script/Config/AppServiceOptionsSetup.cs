@@ -20,6 +20,22 @@ namespace Microsoft.Azure.WebJobs.Script.Configuration
             options.SubscriptionId = _environment.GetSubscriptionId() ?? string.Empty;
             options.RuntimeSiteName = _environment.GetRuntimeSiteName() ?? string.Empty;
             options.SlotName = _environment.GetSlotName() ?? string.Empty;
+            options.RoleInstance = GetRoleInstance() ?? string.Empty;
+        }
+
+        private string GetRoleInstance()
+        {
+            string instanceName = _environment.GetEnvironmentVariable(EnvironmentSettingNames.AzureWebsiteInstanceId);
+            if (string.IsNullOrEmpty(instanceName))
+            {
+                instanceName = _environment.GetEnvironmentVariable(EnvironmentSettingNames.ComputerName);
+                if (string.IsNullOrEmpty(instanceName))
+                {
+                    instanceName = _environment.GetEnvironmentVariable(EnvironmentSettingNames.ContainerName);
+                }
+            }
+
+            return instanceName;
         }
     }
 }

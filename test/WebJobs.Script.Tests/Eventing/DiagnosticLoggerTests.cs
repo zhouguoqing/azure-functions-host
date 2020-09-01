@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Azure.WebJobs.Logging;
+using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.WebHost;
 using Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics;
 using Microsoft.Extensions.Logging;
@@ -26,6 +27,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Eventing
         private readonly AzureMonitorDiagnosticLogger _logger;
         private readonly Mock<IEventGenerator> _mockEventGenerator;
         private readonly IEnvironment _environment = new TestEnvironment();
+        private readonly OptionsWrapper<AppServiceOptions> _appServiceOptionsWrapper;
         private readonly string _category = LogCategories.CreateFunctionCategory(_functionName);
         private readonly HostNameProvider _hostNameProvider;
 
@@ -37,12 +39,23 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Eventing
 
             _mockEventGenerator = new Mock<IEventGenerator>(MockBehavior.Strict);
 
+            var appServiceOptions = new AppServiceOptions
+            {
+                AppName = "TestApp",
+                RoleInstance = "Instance1",
+                SlotName = "Production",
+                SubscriptionId = "abc123",
+                RuntimeSiteName = "TestApp_Runtime"
+            };
+
+            _appServiceOptionsWrapper = new OptionsWrapper<AppServiceOptions>(appServiceOptions);
+
             _category = LogCategories.CreateFunctionCategory(_functionName);
             var loggerProvider = new TestLoggerProvider();
             var loggerFactory = new LoggerFactory();
             loggerFactory.AddProvider(loggerProvider);
             _hostNameProvider = new HostNameProvider(_environment);
-            _logger = new AzureMonitorDiagnosticLogger(_category, _hostInstanceId, _mockEventGenerator.Object, _environment, new LoggerExternalScopeProvider(), _hostNameProvider);
+            _logger = new AzureMonitorDiagnosticLogger(_category, _hostInstanceId, _mockEventGenerator.Object, _environment, new LoggerExternalScopeProvider(), _hostNameProvider, _appServiceOptionsWrapper);
         }
 
         [Fact]
@@ -68,8 +81,12 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Eventing
             _mockEventGenerator.VerifyAll();
 
             JObject actual = JObject.Parse(properties);
+
+            var level = LogLevel.Debug;
             JObject expected = JObject.FromObject(new
             {
+                appName = _appServiceOptionsWrapper.Value.AppName,
+                roleInstance = _appServiceOptionsWrapper.Value.RoleInstance,
                 message,
                 category = _category,
                 hostVersion = ScriptHost.Version,
@@ -77,7 +94,8 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Eventing
                 functionName = _functionName,
                 hostInstanceId = _hostInstanceId,
                 activityId,
-                level = "Debug"
+                level = level.ToString(),
+                levelId = (int)level
             });
 
             Assert.True(JToken.DeepEquals(actual, expected), $"Actual: {actual.ToString()}{Environment.NewLine}Expected: {expected.ToString()}");
@@ -108,9 +126,13 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Eventing
 
             _mockEventGenerator.VerifyAll();
 
+            var level = LogLevel.Error;
+
             JObject actual = JObject.Parse(properties);
             JObject expected = JObject.FromObject(new
             {
+                appName = _appServiceOptionsWrapper.Value.AppName,
+                roleInstance = _appServiceOptionsWrapper.Value.RoleInstance,
                 exceptionType = ex.GetType().ToString(),
                 exceptionMessage = ex.Message,
                 exceptionDetails = ex.ToFormattedString(),
@@ -118,7 +140,8 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Eventing
                 category = _category,
                 hostInstanceId = _hostInstanceId,
                 hostVersion = ScriptHost.Version,
-                level = "Error"
+                level = level.ToString(),
+                levelId = (int)level
             });
 
             Assert.True(JToken.DeepEquals(actual, expected), $"Actual: {actual.ToString()}{Environment.NewLine}Expected: {expected.ToString()}");
@@ -153,9 +176,13 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Eventing
 
             _mockEventGenerator.VerifyAll();
 
+            var level = LogLevel.Error;
+
             JObject actual = JObject.Parse(properties);
             JObject expected = JObject.FromObject(new
             {
+                appName = _appServiceOptionsWrapper.Value.AppName,
+                roleInstance = _appServiceOptionsWrapper.Value.RoleInstance,
                 category = _category,
                 exceptionDetails = sanitizedDetails,
                 exceptionMessage = sanitizedExceptionMessage,
@@ -164,7 +191,8 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Eventing
                 functionName = _functionName,
                 hostInstanceId = _hostInstanceId,
                 hostVersion = ScriptHost.Version,
-                level = "Error",
+                level = level.ToString(),
+                levelId = (int)level,
                 message = sanitizedString,
             });
 
@@ -195,7 +223,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Eventing
             _environment.SetEnvironmentVariable(EnvironmentSettingNames.AzureWebsiteHostName, null);
 
             // Recreate the logger was we cache the site name in the constructor
-            ILogger logger = new AzureMonitorDiagnosticLogger(_category, _hostInstanceId, _mockEventGenerator.Object, _environment, new LoggerExternalScopeProvider(), _hostNameProvider);
+            ILogger logger = new AzureMonitorDiagnosticLogger(_category, _hostInstanceId, _mockEventGenerator.Object, _environment, new LoggerExternalScopeProvider(), _hostNameProvider, _appServiceOptionsWrapper);
 
             logger.LogInformation(message);
 

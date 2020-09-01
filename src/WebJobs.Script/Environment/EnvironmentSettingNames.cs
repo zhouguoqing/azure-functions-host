@@ -1,8 +1,6 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using Microsoft.Azure.AppService.Proxy.Runtime.Configuration.Policies;
-
 namespace Microsoft.Azure.WebJobs.Script
 {
     public static class EnvironmentSettingNames
@@ -18,6 +16,7 @@ namespace Microsoft.Azure.WebJobs.Script
         public const string AzureWebsiteHomePath = "HOME";
         public const string AzureWebJobsScriptRoot = "AzureWebJobsScriptRoot";
         public const string CompilationReleaseMode = "AzureWebJobsDotNetReleaseCompilation";
+        public const string ComputerName = "COMPUTERNAME";
         public const string AzureWebJobsDisableHomepage = "AzureWebJobsDisableHomepage";
         public const string TypeScriptCompilerPath = "AzureWebJobs_TypeScriptPath";
         public const string AzureWebsiteAppCountersName = "WEBSITE_COUNTERS_APP";
@@ -98,7 +97,7 @@ namespace Microsoft.Azure.WebJobs.Script
         public const string CorsAllowedOrigins = "CORS_ALLOWED_ORIGINS";
         public const string CorsSupportCredentials = "CORS_SUPPORT_CREDENTIALS";
 
-       // EasyAuth settings
+        // EasyAuth settings
         public const string EasyAuthClientId = "WEBSITE_AUTH_CLIENT_ID";
         public const string EasyAuthSigningKey = "WEBSITE_AUTH_SIGNING_KEY";
     }
