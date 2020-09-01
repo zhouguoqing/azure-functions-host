@@ -1,6 +1,7 @@
 variables:
   buildNumber: $[ counter('constant', 13000) ] # Start higher than our AppVeyor versions. Every build (pr or branch) will increment.
-
+  integrationTestsBuild: True
+  
 name: 3.0.$(buildNumber)
   
 pr:
