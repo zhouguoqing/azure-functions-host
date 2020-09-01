@@ -1,6 +1,5 @@
 variables:
   buildNumber: $[ counter('constant', 13000) ] # Start higher than our AppVeyor versions. Every build (pr or branch) will increment.
-  integrationTestsBuild: $env:RUNBUILDFORINTEGRATIONTESTS
 
 name: 3.0.$(buildNumber)
   
@@ -260,11 +259,11 @@ jobs:
         throw 'Unable to find Microsoft.Azure.WebJobs.Script.WebHost*.nupkg at ./package'
       }
       Copy-Item -Path $sourcePath -Destination $(Build.ArtifactStagingDirectory) -ErrorAction Stop -Verbose -Force
-    condition: eq(variables.integrationTestsBuild, true)
+    condition: eq(variables.integrationTestsBuild, True)
     displayName: 'Copy package to ArtifactStagingDirectory'
 
   - task: NuGetCommand@2
-    condition: eq(variables.integrationTestsBuild, true)
+    condition: eq(variables.integrationTestsBuild, True)
     inputs:
       command: 'push'
       packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
