@@ -107,24 +107,28 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
 
         internal IWebHostRpcWorkerChannelManager WebHostLanguageWorkerChannelManager => _webHostLanguageWorkerChannelManager;
 
-        internal void InitializeJobhostLanguageWorkerChannelAsync()
+        internal async Task InitializeJobhostLanguageWorkerChannelAsync()
         {
-            // TODO: Add loading here
-            InitializeJobhostLanguageWorkerChannelAsync(0);
+            await InitializeJobhostLanguageWorkerChannelAsync(0);
         }
 
-        internal IRpcWorkerChannel InitializeJobhostLanguageWorkerChannelAsync(int attemptCount)
+        internal async Task InitializeJobhostLanguageWorkerChannelAsync(int attemptCount, Func<Task<IEnumerable<FunctionMetadata>>> getHostFunctionsFunc = null)
         {
             var rpcWorkerChannel = _rpcWorkerChannelFactory.Create(_scriptOptions.RootScriptPath, _workerRuntime, _metricsLogger, attemptCount, _workerConfigs);
+
+            if (getHostFunctionsFunc != null)
+            {
+                await LoadFunctionsIfNotLoaded(getHostFunctionsFunc, rpcWorkerChannel);
+            }
+
             rpcWorkerChannel.SetupFunctionInvocationBuffers(_functions);
             _jobHostLanguageWorkerChannelManager.AddChannel(rpcWorkerChannel);
-            rpcWorkerChannel.StartWorkerProcessAsync().ContinueWith(workerInitTask =>
-            {
-                _logger.LogDebug("Adding jobhost language worker channel for runtime: {language}. workerId:{id}", _workerRuntime, rpcWorkerChannel.Id);
-                rpcWorkerChannel.SendFunctionLoadRequests(_managedDependencyOptions.Value);
-                SetFunctionDispatcherStateToInitializedAndLog();
-            }, TaskContinuationOptions.OnlyOnRanToCompletion);
-            return rpcWorkerChannel;
+            _ = rpcWorkerChannel.StartWorkerProcessAsync().ContinueWith(workerInitTask =>
+              {
+                  _logger.LogDebug("Adding jobhost language worker channel for runtime: {language}. workerId:{id}", _workerRuntime, rpcWorkerChannel.Id);
+                  rpcWorkerChannel.SendFunctionLoadRequests(_managedDependencyOptions.Value);
+                  SetFunctionDispatcherStateToInitializedAndLog();
+              }, TaskContinuationOptions.OnlyOnRanToCompletion);
         }
 
         private void SetFunctionDispatcherStateToInitializedAndLog()
@@ -232,10 +236,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
                 }
                 else
                 {
-                    var channel = InitializeJobhostLanguageWorkerChannelAsync(0);
-                    await LoadFunctionsIfNotLoaded(getHostFunctionsFunc, channel);
-
-                    StartWorkerProcesses(1, InitializeJobhostLanguageWorkerChannelAsync);
+                    await InitializeJobhostLanguageWorkerChannelAsync(0, getHostFunctionsFunc);
+                    StartWorkerProcesses(1, async () => await InitializeJobhostLanguageWorkerChannelAsync());
                 }
             }
 
@@ -244,6 +246,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
 
         private async Task LoadFunctionsIfNotLoaded(Func<Task<IEnumerable<FunctionMetadata>>> getHostFunctionsFunc, IRpcWorkerChannel workerChannel)
         {
+            // TODO: Right now we only make the call to load the functions metadata through one type of process
+            // Need to think about if it makes logical sense to just call it everytime
             if (_functions is null)
             {
                 _functions = await workerChannel.GetFunctionMetadata();
@@ -403,7 +407,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
                 }
                 // Restart worker channel
                 _logger.LogDebug("Restarting worker channel for runtime:{runtime}", runtime);
-                RestartWorkerChannel(runtime, workerId);
+                await RestartWorkerChannel(runtime, workerId);
                 // State is set back to "Initialized" when worker channel is up again
             }
             else
@@ -418,11 +422,11 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
             return string.Equals(_workerRuntime, runtime, StringComparison.InvariantCultureIgnoreCase) && (isWebHostChannel || isJobHostChannel);
         }
 
-        private void RestartWorkerChannel(string runtime, string workerId)
+        private async Task RestartWorkerChannel(string runtime, string workerId)
         {
             if (_languageWorkerErrors.Count < ErrorEventsThreshold)
             {
-                InitializeJobhostLanguageWorkerChannelAsync(_languageWorkerErrors.Count);
+                await InitializeJobhostLanguageWorkerChannelAsync(_languageWorkerErrors.Count);
             }
             else if (_jobHostLanguageWorkerChannelManager.GetChannels().Count() == 0)
             {
