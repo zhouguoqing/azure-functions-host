@@ -128,15 +128,15 @@ namespace Microsoft.Azure.WebJobs.Script.Workers
 
         private void OnProcessExited(object sender, EventArgs e)
         {
-            if (_disposing)
-            {
-                // No action needed
-                return;
-            }
+            //if (_disposing)
+            //{
+            //    // No action needed
+            //    return;
+            //}
             string exceptionMessage = string.Join(",", _processStdErrDataQueue.Where(s => !string.IsNullOrEmpty(s)));
             try
             {
-                if (_process.ExitCode == WorkerConstants.SuccessExitCode)
+                if (_process.ExitCode == WorkerConstants.SuccessExitCode && _disposing)
                 {
                     _process.WaitForExit();
                     _process.Close();

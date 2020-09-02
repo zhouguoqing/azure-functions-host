@@ -278,19 +278,11 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
                     Language = rpcMetadata.Language
                 };
 
+                functionMetadata.SetFunctionId(rpcMetadata.Id);
+
                 foreach (var rpcBinding in rpcMetadata.BindingMetadata)
                 {
-                    var functionBinding = new BindingMetadata()
-                    {
-                        Connection = rpcBinding.Connection,
-                        Direction = (BindingDirection)rpcBinding.Direction,
-                        DataType = (DataType?)rpcBinding.DataType,
-                        Cardinality = (Cardinality?)rpcBinding.Cardinality,
-                        Type = rpcBinding.Type,
-                        Name = rpcBinding.Name
-                    };
-
-                    functionBinding.Raw = JObject.FromObject(functionBinding);
+                    var functionBinding = BindingMetadata.Create(JObject.Parse(rpcBinding.Raw));
                     functionMetadata.Bindings.Add(functionBinding);
                 }
 

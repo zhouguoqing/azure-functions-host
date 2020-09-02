@@ -116,19 +116,31 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.Rpc
         {
             var rpcWorkerChannel = _rpcWorkerChannelFactory.Create(_scriptOptions.RootScriptPath, _workerRuntime, _metricsLogger, attemptCount, _workerConfigs);
 
+            _jobHostLanguageWorkerChannelManager.AddChannel(rpcWorkerChannel);
+
+            await rpcWorkerChannel.StartWorkerProcessAsync();
+            _logger.LogDebug("Adding jobhost language worker channel for runtime: {language}. workerId:{id}", _workerRuntime, rpcWorkerChannel.Id);
             if (getHostFunctionsFunc != null)
             {
                 await LoadFunctionsIfNotLoaded(getHostFunctionsFunc, rpcWorkerChannel);
             }
-
             rpcWorkerChannel.SetupFunctionInvocationBuffers(_functions);
-            _jobHostLanguageWorkerChannelManager.AddChannel(rpcWorkerChannel);
-            _ = rpcWorkerChannel.StartWorkerProcessAsync().ContinueWith(workerInitTask =>
-              {
-                  _logger.LogDebug("Adding jobhost language worker channel for runtime: {language}. workerId:{id}", _workerRuntime, rpcWorkerChannel.Id);
-                  rpcWorkerChannel.SendFunctionLoadRequests(_managedDependencyOptions.Value);
-                  SetFunctionDispatcherStateToInitializedAndLog();
-              }, TaskContinuationOptions.OnlyOnRanToCompletion);
+            rpcWorkerChannel.SendFunctionLoadRequests(_managedDependencyOptions.Value);
+            SetFunctionDispatcherStateToInitializedAndLog();
+
+            //_ = rpcWorkerChannel.StartWorkerProcessAsync().ContinueWith(async (workerInitTask) =>
+            //  {
+            //      _logger.LogDebug("Adding jobhost language worker channel for runtime: {language}. workerId:{id}", _workerRuntime, rpcWorkerChannel.Id);
+            //      if (getHostFunctionsFunc != null)
+            //      {
+            //          await LoadFunctionsIfNotLoaded(getHostFunctionsFunc, rpcWorkerChannel);
+            //      }
+            //      rpcWorkerChannel.SetupFunctionInvocationBuffers(_functions);
+            //      rpcWorkerChannel.SendFunctionLoadRequests(_managedDependencyOptions.Value);
+            //      SetFunctionDispatcherStateToInitializedAndLog();
+            //  }, TaskContinuationOptions.OnlyOnRanToCompletion);
+
+            //return Task.CompletedTask;
         }
 
         private void SetFunctionDispatcherStateToInitializedAndLog()
