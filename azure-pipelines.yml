@@ -57,16 +57,6 @@ jobs:
       version: '3.1.x'
       performMultiLevelLookup: true
 
-  - pwsh: |
-      $integrationTestsBuild = $null
-      if (-not ([bool]::TryParse($env:RUNBUILDFORINTEGRATIONTESTS, [ref] $integrationTestsBuild)))
-      {
-        throw "integrationTestsBuild can only be set to True or False. Current value is set to $env:RUNBUILDFORINTEGRATIONTESTS"
-      }
-      Write-Host "##vso[task.setvariable variable=UploadPackage]$integrationTestsBuild"
-      Write-Host "integrationTestsBuild: $integrationTestsBuild"
-    displayName: 'Set IntegrationTestsBuild variable'
-
   - task: PowerShell@2
     displayName: "Build artifacts"
     inputs:
@@ -260,11 +250,11 @@ jobs:
         throw 'Unable to find Microsoft.Azure.WebJobs.Script.WebHost*.nupkg at ./package'
       }
       Copy-Item -Path $sourcePath -Destination $(Build.ArtifactStagingDirectory) -ErrorAction Stop -Verbose -Force
-    condition: eq(variables.integrationTestsBuild, True)
+    condition: eq(variables['integrationTestsBuild'], 'True')
     displayName: 'Copy package to ArtifactStagingDirectory'
 
   - task: NuGetCommand@2
-    condition: eq(variables.integrationTestsBuild, True)
+    condition: eq(variables['integrationTestsBuild'], 'True')
     inputs:
       command: 'push'
       packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
