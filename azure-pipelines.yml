@@ -43,11 +43,11 @@ jobs:
         throw 'Unable to find Microsoft.Azure.WebJobs.Script.WebHost*.nupkg at ./package'
       }
       Copy-Item -Path $sourcePath -Destination $(Build.ArtifactStagingDirectory) -ErrorAction Stop -Verbose -Force
-    condition: eq($RUNBUILDFORINTEGRATIONTESTS, 'True')
+    condition: eq(variables.integrationTestsBuild, 'True')
     displayName: 'Copy package to ArtifactStagingDirectory'
 
   - task: NuGetCommand@2
-    condition: eq($RUNBUILDFORINTEGRATIONTESTS, 'True')
+    condition: eq(variables.integrationTestsBuild, 'True')
     inputs:
       command: 'push'
       packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
