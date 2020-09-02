@@ -58,7 +58,6 @@ jobs:
       performMultiLevelLookup: true
 
   - pwsh: |
-      $integrationTestsBuild = $null
       if (-not ([bool]::TryParse($env:RUNBUILDFORINTEGRATIONTESTS, [ref] $integrationTestsBuild)))
       {
         throw "integrationTestsBuild can only be set to True or False. Current value is set to $env:RUNBUILDFORINTEGRATIONTESTS"
