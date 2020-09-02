@@ -1,6 +1,6 @@
 variables:
   buildNumber: $[ counter('constant', 13000) ] # Start higher than our AppVeyor versions. Every build (pr or branch) will increment.
-  integrationTestsBuild: $($env:RUNBUILDFORINTEGRATIONTESTS)
+  integrationTestsBuild: $env:RUNBUILDFORINTEGRATIONTESTS
   
 name: 3.0.$(buildNumber)
   
@@ -47,7 +47,7 @@ jobs:
     displayName: 'Copy package to ArtifactStagingDirectory'
 
   - task: NuGetCommand@2
-    condition: eq(variables['integrationTestsBuild'], 'True')
+    condition: eq($(variables['integrationTestsBuild']), 'True')
     inputs:
       command: 'push'
       packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
