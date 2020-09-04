@@ -77,6 +77,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\WebJobs.Script.Abstractions\WebJobs.Script.Abstractions.csproj" />
     <ProjectReference Include="..\WebJobs.Script.Grpc\WebJobs.Script.Grpc.csproj" />
   </ItemGroup>
 

@@ -10,8 +10,9 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Microsoft.Azure.WebJobs.Host;
+using Microsoft.Azure.WebJobs.Script.Abstractions.Description;
 using Microsoft.Azure.WebJobs.Script.Binding;
-using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.Extensibility;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
@@ -216,7 +217,7 @@ namespace Microsoft.Azure.WebJobs.Script.Description
             }
         }
 
-        protected static void ApplyMethodLevelAttributes(FunctionMetadata functionMetadata, BindingMetadata triggerMetadata, Collection<CustomAttributeBuilder> methodAttributes)
+        protected void ApplyMethodLevelAttributes(FunctionMetadata functionMetadata, BindingMetadata triggerMetadata, Collection<CustomAttributeBuilder> methodAttributes)
         {
             if (Utility.IsHttporManualTrigger(triggerMetadata.Type))
             {
@@ -226,6 +227,45 @@ namespace Microsoft.Azure.WebJobs.Script.Description
                 CustomAttributeBuilder attributeBuilder = new CustomAttributeBuilder(ctorInfo, new object[0]);
                 methodAttributes.Add(attributeBuilder);
             }
+
+            CustomAttributeBuilder retryCustomAttributeBuilder = null;
+
+            // apply the retry settings from function.json
+            if (functionMetadata.FunctionRetry != null)
+            {
+                retryCustomAttributeBuilder = GetRetryCustomAttributeBuilder(functionMetadata.FunctionRetry);
+            }
+            else if (Config.FunctionRetry != null)
+            {
+                // apply the retry settings from host.json
+                retryCustomAttributeBuilder = GetRetryCustomAttributeBuilder(Config.FunctionRetry);
+            }
+            if (retryCustomAttributeBuilder != null)
+            {
+                methodAttributes.Add(retryCustomAttributeBuilder);
+            }
+        }
+
+        internal static CustomAttributeBuilder GetRetryCustomAttributeBuilder(Retry functionRetry)
+        {
+            switch (functionRetry.Strategy)
+            {
+                case RetryStrategy.FixedDelay:
+                    Type fixedDelayRetryType = typeof(FixedDelayRetryAttribute);
+                    ConstructorInfo fixedDelayRetryCtorInfo = fixedDelayRetryType.GetConstructor(new[] { typeof(int), typeof(string) });
+                    CustomAttributeBuilder fixedDelayRetryBuilder = new CustomAttributeBuilder(
+                    fixedDelayRetryCtorInfo,
+                    new object[] { functionRetry.MaxRetryCount, functionRetry.DelayInterval.ToString() });
+                    return fixedDelayRetryBuilder;
+                case RetryStrategy.ExponentialBackoff:
+                    Type exponentialBackoffRetryType = typeof(ExponentialBackoffRetryAttribute);
+                    ConstructorInfo exponentialBackoffDelayRetryCtorInfo = exponentialBackoffRetryType.GetConstructor(new[] { typeof(int), typeof(string), typeof(string) });
+                    CustomAttributeBuilder exponentialBackoffRetryBuilder = new CustomAttributeBuilder(
+                    exponentialBackoffDelayRetryCtorInfo,
+                    new object[] { functionRetry.MaxRetryCount, functionRetry.MinimumInterval.ToString(), functionRetry.MaximumInterval.ToString() });
+                    return exponentialBackoffRetryBuilder;
+            }
+            return null;
         }
 
         protected abstract IFunctionInvoker CreateFunctionInvoker(string scriptFilePath, BindingMetadata triggerMetadata, FunctionMetadata functionMetadata, Collection<FunctionBinding> inputBindings, Collection<FunctionBinding> outputBindings);

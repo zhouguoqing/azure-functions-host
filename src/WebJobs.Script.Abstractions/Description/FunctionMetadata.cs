@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using Microsoft.Azure.WebJobs.Script.Abstractions.Description;
 
 namespace Microsoft.Azure.WebJobs.Script.Description
 {
@@ -64,5 +65,7 @@ namespace Microsoft.Azure.WebJobs.Script.Description
         {
             get { return InputBindings.FirstOrDefault(binding => binding.IsTrigger); }
         }
+
+        public Retry FunctionRetry { get; set; }
     }
 }

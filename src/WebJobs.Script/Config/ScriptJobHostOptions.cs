@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
+using Microsoft.Azure.WebJobs.Script.Abstractions.Description;
 
 namespace Microsoft.Azure.WebJobs.Script
 {
@@ -106,5 +107,7 @@ namespace Microsoft.Azure.WebJobs.Script
         /// locally or via CLI.
         /// </summary>
         public bool IsSelfHost { get; set; }
+
+        public Retry FunctionRetry { get; set; }
     }
 }
