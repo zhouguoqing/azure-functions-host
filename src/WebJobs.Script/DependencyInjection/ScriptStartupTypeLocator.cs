@@ -115,12 +115,13 @@ namespace Microsoft.Azure.WebJobs.Script.DependencyInjection
 
             foreach (var extensionItem in extensionItems)
             {
-                if (!bundleConfigured
+                if ((!bundleConfigured
                     || extensionItem.Bindings.Count == 0
                     // || extensionItem.Bindings.Intersect(bindingsSet, StringComparer.OrdinalIgnoreCase).Any())
                     // TODO: We may need to change the scope of the RpcWorkerChannelFactory to keep this opmitization
                     // I think it's doable. But for the purpose of a proof of concept, we will just load all extensions
                     || extensionItem.Bindings.Any())
+                    && false)
                 {
                     string startupExtensionName = extensionItem.Name ?? extensionItem.TypeName;
                     _logger.ScriptStartUpLoadingStartUpExtension(startupExtensionName);
