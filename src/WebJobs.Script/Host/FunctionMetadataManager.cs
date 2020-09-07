@@ -201,7 +201,7 @@ namespace Microsoft.Azure.WebJobs.Script
 
         private void LoadCustomProviderFunctions(List<FunctionMetadata> functionMetadataList)
         {
-            if (_functionProviders != null && _functionProviders.Any())
+            if (_functionProviders != null && _functionProviders.Any() && false)
             {
                 AddMetadataFromCustomProviders(functionMetadataList);
             }
