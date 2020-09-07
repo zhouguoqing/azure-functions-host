@@ -267,52 +267,64 @@ namespace Microsoft.Azure.WebJobs.Script
         /// </summary>
         public async Task InitializeAsync(CancellationToken cancellationToken = default)
         {
-            _stopwatch.Start();
-            using (_metricsLogger.LatencyEvent(MetricEventNames.HostStartupLatency))
+            int i = 0;
+
+            try
             {
-                PreInitialize();
-                HostInitializing?.Invoke(this, EventArgs.Empty);
-
-                // Initialize worker function invocation dispatcher only for valid functions after creating function descriptors
-                // Dispatcher not needed for non-proxy codeless function.
-
-                (IEnumerable<FunctionMetadata> freshMetadata, bool loadedByWorker) = await _functionDispatcher.InitializeAsync(
-                    async () => await LoadFunctionMetadataFromHost(cancellationToken), cancellationToken);
-
-                // If these functions were loaded by the worker, we now need to load it to the FunctionMetadata
-                // and initialize the descriptors
-                if (loadedByWorker)
+                _stopwatch.Start();
+                using (_metricsLogger.LatencyEvent(MetricEventNames.HostStartupLatency))
                 {
-                    _functionMetadataManager.OverwriteInternalFunctionMetadata(freshMetadata.ToList());
-                    await InitializeFunctionDescriptorsAsync(freshMetadata, cancellationToken);
-                }
-
-                // Generate Functions
-                _workerRuntime = _workerRuntime ?? Utility.GetWorkerRuntime(freshMetadata);
-
-                if (!_environment.IsPlaceholderModeEnabled())
-                {
-                    string runtimeStack = _workerRuntime;
-
-                    if (!string.IsNullOrEmpty(_environment.GetEnvironmentVariable(RpcWorkerConstants.FunctionWorkerRuntimeSettingName)))
+                    i++;
+                    PreInitialize();
+                    i++;
+                    HostInitializing?.Invoke(this, EventArgs.Empty);
+                    i++;
+                    // Initialize worker function invocation dispatcher only for valid functions after creating function descriptors
+                    // Dispatcher not needed for non-proxy codeless function.
+                    i++;
+                    (IEnumerable<FunctionMetadata> freshMetadata, bool loadedByWorker) = await _functionDispatcher.InitializeAsync(
+                        async () => await LoadFunctionMetadataFromHost(cancellationToken), cancellationToken);
+                    i++;
+                    // If these functions were loaded by the worker, we now need to load it to the FunctionMetadata
+                    // and initialize the descriptors
+                    if (loadedByWorker)
                     {
-                        // Appending the runtime version is currently only enabled for linux consumption. This will be eventually enabled for
-                        // Windows Consumption as well.
-                        string runtimeVersion = _environment.GetEnvironmentVariable(RpcWorkerConstants.FunctionWorkerRuntimeVersionSettingName);
-
-                        if (!string.IsNullOrEmpty(runtimeVersion))
-                        {
-                            runtimeStack = string.Concat(runtimeStack, "-", runtimeVersion);
-                        }
+                        _functionMetadataManager.OverwriteInternalFunctionMetadata(freshMetadata.ToList());
+                        await InitializeFunctionDescriptorsAsync(freshMetadata, cancellationToken);
                     }
+                    i++;
+                    // Generate Functions
+                    _workerRuntime = _workerRuntime ?? Utility.GetWorkerRuntime(freshMetadata);
+                    i++;
+                    if (!_environment.IsPlaceholderModeEnabled())
+                    {
+                        string runtimeStack = _workerRuntime;
 
-                    _metricsLogger.LogEvent(string.Format(MetricEventNames.HostStartupRuntimeLanguage, runtimeStack));
+                        if (!string.IsNullOrEmpty(_environment.GetEnvironmentVariable(RpcWorkerConstants.FunctionWorkerRuntimeSettingName)))
+                        {
+                            // Appending the runtime version is currently only enabled for linux consumption. This will be eventually enabled for
+                            // Windows Consumption as well.
+                            string runtimeVersion = _environment.GetEnvironmentVariable(RpcWorkerConstants.FunctionWorkerRuntimeVersionSettingName);
+
+                            if (!string.IsNullOrEmpty(runtimeVersion))
+                            {
+                                runtimeStack = string.Concat(runtimeStack, "-", runtimeVersion);
+                            }
+                        }
+
+                        _metricsLogger.LogEvent(string.Format(MetricEventNames.HostStartupRuntimeLanguage, runtimeStack));
+                    }
+                    i++;
+                    var directTypes = GetDirectTypes(_functionMetadataManager.GetFunctionMetadata());
+                    GenerateFunctions(directTypes);
+
+                    ScheduleFileSystemCleanup();
                 }
-
-                var directTypes = GetDirectTypes(_functionMetadataManager.GetFunctionMetadata());
-                GenerateFunctions(directTypes);
-
-                ScheduleFileSystemCleanup();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"THIS IS THE ERROR SPOT! {i}." + $"The error is {ex.Message}");
+                throw new Exception($"THIS IS THE ERROR SPOT! {i}." + $"The error is {ex.Message}");
             }
         }
 

@@ -116,10 +116,10 @@ namespace Microsoft.Azure.WebJobs.Script
         {
             _functionMetadataMap.Clear();
 
-            _functionProviders = _serviceProvider.GetService<IEnumerable<IFunctionProvider>>();
-            _isHttpWorker = _serviceProvider.GetService<IOptions<HttpWorkerOptions>>()?.Value?.Description != null;
-            _scriptOptions = _serviceProvider.GetService<IOptions<ScriptJobHostOptions>>();
-            _languageWorkerOptions = _serviceProvider.GetService<IOptions<LanguageWorkerOptions>>();
+            _functionProviders = _serviceProvider?.GetService<IEnumerable<IFunctionProvider>>();
+            _isHttpWorker = _serviceProvider?.GetService<IOptions<HttpWorkerOptions>>()?.Value?.Description != null;
+            _scriptOptions = _serviceProvider?.GetService<IOptions<ScriptJobHostOptions>>();
+            _languageWorkerOptions = _serviceProvider?.GetService<IOptions<LanguageWorkerOptions>>();
 
             // Resetting the logger switches the logger scope to Script Host level,
             // also making the logs available to Application Insights
