@@ -297,6 +297,9 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                 {
                     LastError = exc;
                     State = ScriptHostState.Error;
+                    logger.LogError(exc.StackTrace);
+                    logger.LogError(exc.InnerException.Message);
+                    logger.LogError(exc.ToString());
                     logger.ErrorOccuredDuringStartupOperation(activeOperation.Id, exc);
                 }
                 else
