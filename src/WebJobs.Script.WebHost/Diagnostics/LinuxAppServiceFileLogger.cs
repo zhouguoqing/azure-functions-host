@@ -35,7 +35,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics
 
             if (startOnCreate)
             {
-                Start();
+                //Start();
             }
         }
 
@@ -52,7 +52,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics
         {
             try
             {
-                _buffer.Add(message);
+                //_buffer.Add(message);
             }
             catch (Exception)
             {
