@@ -406,17 +406,17 @@ namespace Microsoft.Azure.WebJobs.Script.Description
             List<string> rids = DependencyHelper.GetRuntimeFallbacks();
 
             string result = rids.Select(r => Path.Combine(runtimesPath, r, ridSubFolder, assetFileName))
-                .Union(probingPaths.Select(p => Path.Combine(p, assetFileName)))
+                .Union(probingPaths)
                 .FirstOrDefault(p => fileBase.Exists(p));
 
             // Need to also probe with the parent directory as the base due to
             // issue https://github.com/Azure/azure-functions-host/issues/6620
             if (result == null)
             {
-                string fallbackBasePath = Directory.GetParent(basePath).FullName;
-                string fallbackRuntimesPath = Path.Combine(fallbackBasePath, "runtimes");
-                result = rids.Select(r => Path.Combine(fallbackRuntimesPath, r, ridSubFolder, assetFileName))
-                    .FirstOrDefault(p => fileBase.Exists(p));
+                //string fallbackBasePath = Directory.GetParent(basePath).FullName;
+                //string fallbackRuntimesPath = Path.Combine(fallbackBasePath, "runtimes");
+                //result = rids.Select(r => Path.Combine(fallbackRuntimesPath, r, ridSubFolder, assetFileName))
+                //    .FirstOrDefault(p => fileBase.Exists(p));
             }
 
             return result;
