@@ -80,6 +80,14 @@ namespace Microsoft.Azure.WebJobs.Script.Description
         public async Task<object> Invoke(object[] parameters)
         {
             FunctionInvocationContext context = GetContextFromParameters(parameters, Metadata);
+            try
+            {
+                throw new Exception("Some exception");
+            }
+            catch (Exception ex)
+            {
+                FunctionLogger.LogError(ex, "Random exception");
+            }
             return await InvokeCore(parameters, context);
         }
 

@@ -262,6 +262,15 @@ namespace Microsoft.Azure.WebJobs.Script.Description
 
         protected override async Task<object> InvokeCore(object[] parameters, FunctionInvocationContext context)
         {
+            try
+            {
+                throw new Exception("Some exception");
+            }
+            catch (Exception ex)
+            {
+                FunctionLogger.LogError(ex, "Random exception");
+            }
+
             MethodInfo function = await GetFunctionTargetAsync(isInvocation: true);
 
             // Separate system parameters from the actual method parameters

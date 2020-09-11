@@ -87,15 +87,6 @@ namespace Microsoft.Azure.WebJobs.Script.Description
                 Logger = context.Logger
             };
 
-            try
-            {
-                throw new Exception("Some exception");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Random exception");
-            }
-
             string invocationId = context.ExecutionContext.InvocationId.ToString();
             _logger.LogTrace($"Sending invocation id:{invocationId}");
             await _functionDispatcher.InvokeAsync(invocationContext);
