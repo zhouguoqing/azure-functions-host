@@ -74,10 +74,10 @@ namespace Microsoft.Azure.WebJobs.Script.Diagnostics
                     // failures, so we drill into the very inner exception, which will
                     // be the script error
                     Exception actualException = exception;
-                    /*while (actualException.InnerException != null)
+                    while (actualException.InnerException != null)
                     {
                         actualException = actualException.InnerException;
-                    }*/
+                    }
 
                     formattedMessage += $"{Environment.NewLine}{actualException.Message}";
                 }
