@@ -119,6 +119,8 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
 
             if (functionExecution.CanExecute)
             {
+                await Task.Delay(100);
+
                 // Add the request to the logging scope. This allows the App Insights logger to
                 // record details about the request.
                 ILoggerFactory loggerFactory = context.RequestServices.GetService<ILoggerFactory>();
